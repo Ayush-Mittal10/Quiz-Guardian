@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -36,6 +35,12 @@ interface Quiz {
   totalQuestions: number;
 }
 
+interface ProfileResult {
+  id: string;
+  name: string;
+  email: string;
+}
+
 const Results = () => {
   const { quizId } = useParams<{ quizId: string }>();
   const { user } = useAuth();
@@ -69,7 +74,7 @@ const Results = () => {
           
         if (countError) throw countError;
         
-        // Fetch attempts with student profiles
+        // Fetch attempts
         const { data: attemptsData, error: attemptsError } = await supabase
           .from('quiz_attempts')
           .select(`
@@ -81,18 +86,41 @@ const Results = () => {
             answers,
             warnings,
             auto_submitted,
-            score,
-            profiles:student_id (
-              id,
-              name,
-              auth.users!auth_users (
-                email
-              )
-            )
+            score
           `)
           .eq('quiz_id', quizId);
           
         if (attemptsError) throw attemptsError;
+        
+        // Get student profiles separately
+        const studentIds = attemptsData.map(attempt => attempt.student_id);
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            name
+          `)
+          .in('id', studentIds);
+          
+        if (profilesError) throw profilesError;
+        
+        // Get user emails separately
+        const { data: usersData, error: usersError } = await supabase
+          .auth.admin.listUsers({
+            perPage: 1000,
+          });
+        
+        if (usersError) throw usersError;
+        
+        // Create a lookup map for profiles and emails
+        const profilesMap = new Map();
+        profilesData.forEach(profile => {
+          profilesMap.set(profile.id, {
+            id: profile.id,
+            name: profile.name,
+            email: usersData.users.find(u => u.id === profile.id)?.email || ''
+          });
+        });
         
         // Transform data to match our component's expected format
         const formattedQuiz: Quiz = {
@@ -103,19 +131,27 @@ const Results = () => {
           totalQuestions: questionCount || 0
         };
         
-        const formattedAttempts: QuizAttempt[] = attemptsData.map(attempt => ({
-          id: attempt.id,
-          student: {
-            id: attempt.profiles.id,
-            name: attempt.profiles.name,
-            email: attempt.profiles.auth_users?.email || ''
-          },
-          score: attempt.score || 0,
-          timeSpent: calculateTimeSpent(attempt.started_at, attempt.submitted_at),
-          submittedAt: attempt.submitted_at || attempt.started_at,
-          autoSubmitted: attempt.auto_submitted || false,
-          warnings: attempt.warnings || []
-        }));
+        const formattedAttempts: QuizAttempt[] = attemptsData.map(attempt => {
+          const studentProfile = profilesMap.get(attempt.student_id) || {
+            id: attempt.student_id,
+            name: 'Unknown Student',
+            email: ''
+          };
+          
+          return {
+            id: attempt.id,
+            student: {
+              id: studentProfile.id,
+              name: studentProfile.name,
+              email: studentProfile.email
+            },
+            score: attempt.score || 0,
+            timeSpent: calculateTimeSpent(attempt.started_at, attempt.submitted_at),
+            submittedAt: attempt.submitted_at || attempt.started_at,
+            autoSubmitted: attempt.auto_submitted || false,
+            warnings: attempt.warnings || []
+          };
+        });
         
         setQuiz(formattedQuiz);
         setAttempts(formattedAttempts);
