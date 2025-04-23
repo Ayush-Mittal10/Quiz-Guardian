@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { QuizHeader } from '@/components/quiz/QuizHeader';
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz } from '@/types';
+import { Quiz, QuizSettings } from '@/types';
 
 const EditQuiz = () => {
   const { quizId } = useParams<{ quizId: string }>();
@@ -33,7 +33,21 @@ const EditQuiz = () => {
 
       if (error) throw error;
       if (!data) throw new Error('Quiz not found');
-      return data as Quiz;
+      
+      // Map the Supabase data structure to our Quiz type structure
+      const formattedQuiz: Quiz = {
+        id: data.id,
+        title: data.title,
+        description: data.description || '',
+        createdBy: data.created_by,
+        createdAt: data.created_at,
+        settings: data.settings as unknown as QuizSettings,
+        questions: [], // We'll fetch questions separately if needed
+        testId: data.test_id,
+        isActive: data.is_active
+      };
+      
+      return formattedQuiz;
     },
   });
 
