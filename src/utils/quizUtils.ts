@@ -13,13 +13,13 @@ export async function saveQuiz(
     // Generate a unique test ID (uppercase letters and numbers)
     const testId = Math.random().toString(36).substring(2, 8).toUpperCase();
     
-    // Insert the quiz
+    // Insert the quiz - explicitly cast settings to Json type expected by Supabase
     const { data: quizData, error: quizError } = await supabase
       .from('quizzes')
       .insert({
         title,
         description,
-        settings,
+        settings: settings as any, // Cast to any to satisfy TypeScript
         created_by: userId,
         test_id: testId
       })

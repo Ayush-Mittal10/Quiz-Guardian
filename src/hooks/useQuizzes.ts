@@ -1,6 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
-import { Quiz } from '@/types';
+import { Quiz, QuizSettings } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -34,7 +34,7 @@ export function useQuizzes() {
       description: quiz.description || '',
       createdBy: quiz.created_by,
       createdAt: quiz.created_at,
-      settings: quiz.settings,
+      settings: quiz.settings as unknown as QuizSettings, // Type assertion to convert Json to QuizSettings
       questions: [], // We'll fetch questions separately when needed
       testId: quiz.test_id
     }));
