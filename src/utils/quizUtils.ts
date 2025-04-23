@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, QuizQuestion, QuizSettings, Warning } from '@/types';
+import { Quiz, QuizQuestion, QuizSettings, Warning, JsonWarning } from '@/types';
 
 export async function saveQuiz(
   title: string, 
@@ -118,6 +118,13 @@ export async function saveQuizAttempt(
     // Calculate percentage score (rounded to nearest integer)
     const scorePercentage = Math.round((totalScore / totalPossibleScore) * 100);
     
+    // Convert warnings to JsonWarning format for database storage
+    const jsonWarnings: JsonWarning[] = warnings.map(warning => ({
+      type: warning.type,
+      timestamp: warning.timestamp,
+      description: warning.description
+    }));
+    
     // Insert the attempt
     const { data: attemptData, error: attemptError } = await supabase
       .from('quiz_attempts')
@@ -125,7 +132,7 @@ export async function saveQuizAttempt(
         quiz_id: quizId,
         student_id: studentId,
         answers: answers,
-        warnings: warnings,
+        warnings: jsonWarnings,
         auto_submitted: autoSubmitted,
         score: scorePercentage,
         submitted_at: new Date().toISOString()

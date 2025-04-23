@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, Warning, QuizAttempt } from '@/types';
+import { Quiz, Warning, QuizAttempt, JsonWarning } from '@/types';
 
 export const useQuizResults = (quizId: string | undefined) => {
   const [loading, setLoading] = useState(true);
@@ -19,7 +19,7 @@ export const useQuizResults = (quizId: string | undefined) => {
         // Fetch quiz details
         const { data: quizData, error: quizError } = await supabase
           .from('quizzes')
-          .select('id, title, description, test_id')
+          .select('id, title, description, test_id, settings')
           .eq('id', quizId)
           .single();
         
@@ -63,13 +63,7 @@ export const useQuizResults = (quizId: string | undefined) => {
             testId: quizData.test_id,
             createdBy: '',
             createdAt: '',
-            settings: {
-              timeLimit: 0,
-              shuffleQuestions: false,
-              showResults: false,
-              monitoringEnabled: false,
-              allowedWarnings: 0
-            },
+            settings: quizData.settings,
             questions: []
           });
           setAttempts([]);
@@ -105,13 +99,7 @@ export const useQuizResults = (quizId: string | undefined) => {
           testId: quizData.test_id,
           createdBy: '',
           createdAt: '',
-          settings: {
-            timeLimit: 0,
-            shuffleQuestions: false,
-            showResults: false,
-            monitoringEnabled: false,
-            allowedWarnings: 0
-          },
+          settings: quizData.settings,
           questions: []
         };
         
@@ -122,13 +110,13 @@ export const useQuizResults = (quizId: string | undefined) => {
             email: ''
           };
           
-          const parsedWarnings: Warning[] = Array.isArray(attempt.warnings) 
-            ? attempt.warnings.map((warning: any) => ({
-                type: warning.type,
-                timestamp: warning.timestamp,
-                description: warning.description || ''
-              }))
-            : [];
+          // Convert JSON warnings to our Warning type
+          const jsonWarnings: JsonWarning[] = Array.isArray(attempt.warnings) ? attempt.warnings : [];
+          const parsedWarnings: Warning[] = jsonWarnings.map(warning => ({
+            type: warning.type,
+            timestamp: warning.timestamp,
+            description: warning.description || ''
+          }));
           
           // Calculate time spent between start and submission time
           const startTime = new Date(attempt.started_at).getTime();
@@ -148,11 +136,11 @@ export const useQuizResults = (quizId: string | undefined) => {
             // Additional properties for UI rendering
             student: studentProfile,
             timeSpent: timeSpent
-          } as QuizAttempt & { student: any; timeSpent: number };
+          };
         });
         
         setQuiz(formattedQuiz);
-        setAttempts(formattedAttempts as unknown as QuizAttempt[]);
+        setAttempts(formattedAttempts);
       } catch (error: any) {
         console.error('Error fetching data:', error);
         toast({

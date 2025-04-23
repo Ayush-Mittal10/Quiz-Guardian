@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { QuizAttempt } from '@/types';
+import { QuizAttempt, JsonWarning, Warning } from '@/types';
 
 export function useStudentAttempts() {
   const { user } = useAuth();
@@ -45,7 +45,13 @@ export function useStudentAttempts() {
           const endTime = attempt.submitted_at ? new Date(attempt.submitted_at).getTime() : Date.now();
           const timeSpent = Math.round((endTime - startTime) / 1000); // in seconds
           
-          const warnings = Array.isArray(attempt.warnings) ? attempt.warnings : [];
+          // Process warnings with proper type handling
+          const jsonWarnings: JsonWarning[] = Array.isArray(attempt.warnings) ? attempt.warnings : [];
+          const warnings: Warning[] = jsonWarnings.map(w => ({
+            timestamp: w.timestamp,
+            type: w.type,
+            description: w.description || ''
+          }));
           
           return {
             id: attempt.id,

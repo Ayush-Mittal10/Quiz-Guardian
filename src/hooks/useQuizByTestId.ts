@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, QuizQuestion } from '@/types';
+import { Quiz, QuizQuestion, QuizSettings } from '@/types';
 
 export function useQuizByTestId(testId: string | undefined) {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -54,13 +54,16 @@ export function useQuizByTestId(testId: string | undefined) {
           points: q.points
         }));
         
+        // Type assertion for settings to ensure it conforms to our QuizSettings type
+        const settings = quizData.settings as QuizSettings;
+        
         const formattedQuiz: Quiz = {
           id: quizData.id,
           title: quizData.title,
           description: quizData.description || '',
           createdBy: quizData.created_by,
           createdAt: quizData.created_at,
-          settings: quizData.settings,
+          settings: settings,
           questions: formattedQuestions,
           testId: quizData.test_id
         };
