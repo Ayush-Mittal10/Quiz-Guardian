@@ -1,6 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
+import { Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
@@ -23,38 +25,88 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Setup auth listener and check for session
   useEffect(() => {
-    // Check for stored user in local storage
-    const storedUser = localStorage.getItem('quiz-user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          // Fetch user profile data
+          setTimeout(async () => {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('name, role')
+              .eq('id', session.user.id)
+              .single();
+
+            if (!error && data) {
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                name: data.name,
+                role: data.role as UserRole,
+                createdAt: session.user.created_at || new Date().toISOString(),
+              });
+            }
+          }, 0);
+        } else {
+          setUser(null);
+        }
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      
+      if (session?.user) {
+        // Fetch user profile data
+        supabase
+          .from('profiles')
+          .select('name, role')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data, error }) => {
+            if (!error && data) {
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                name: data.name,
+                role: data.role as UserRole,
+                createdAt: session.user.created_at || new Date().toISOString(),
+              });
+            }
+            setIsLoading(false);
+          });
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // This is a mock implementation - in a real app, you'd call an API
       // Validate that it's an institute email
       if (!email.endsWith('.edu')) {
         throw new Error('Only institutional email addresses are allowed');
       }
 
-      // Mock response - in a real app, this would come from your backend
-      const mockUser: User = {
-        id: `user-${Date.now()}`,
-        name: email.split('@')[0],
+      const { error } = await supabase.auth.signInWithPassword({
         email,
-        role: email.includes('professor') ? 'professor' : 'student',
-        createdAt: new Date().toISOString(),
-      };
+        password,
+      });
 
-      // Store in localStorage for persistence
-      localStorage.setItem('quiz-user', JSON.stringify(mockUser));
-      setUser(mockUser);
+      if (error) throw error;
     } catch (error: any) {
       throw new Error(error.message || 'Login failed');
     } finally {
@@ -70,18 +122,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Only institutional email addresses are allowed');
       }
 
-      // Mock registration - in a real app, this would call your backend API
-      const mockUser: User = {
-        id: `user-${Date.now()}`,
-        name,
+      const { error } = await supabase.auth.signUp({
         email,
-        role,
-        createdAt: new Date().toISOString(),
-      };
+        password,
+        options: {
+          data: {
+            name,
+            role
+          }
+        }
+      });
 
-      // Store in localStorage for persistence
-      localStorage.setItem('quiz-user', JSON.stringify(mockUser));
-      setUser(mockUser);
+      if (error) throw error;
     } catch (error: any) {
       throw new Error(error.message || 'Registration failed');
     } finally {
@@ -89,8 +141,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('quiz-user');
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
   };
 

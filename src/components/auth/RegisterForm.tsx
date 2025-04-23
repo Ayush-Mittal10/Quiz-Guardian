@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useNavigate } from 'react-router-dom';
 import { UserRole } from '@/types';
+import { useToast } from '@/components/ui/use-toast';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -37,6 +39,7 @@ export function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -64,9 +67,18 @@ export function RegisterForm() {
     
     try {
       await register(data.name, data.email, data.password, data.role as UserRole);
+      toast({
+        title: "Account created",
+        description: "Your account has been created successfully.",
+      });
       navigate('/dashboard');
     } catch (error: any) {
       setError(error.message || 'Registration failed. Please try again.');
+      toast({
+        title: "Registration failed",
+        description: error.message || 'Please try again.',
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }

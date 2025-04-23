@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/components/ui/use-toast';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address').refine(
@@ -25,6 +26,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -40,9 +42,18 @@ export function LoginForm() {
     
     try {
       await login(data.email, data.password);
+      toast({
+        title: "Login successful",
+        description: "You have been logged in.",
+      });
       navigate('/dashboard');
     } catch (error: any) {
       setError(error.message || 'Login failed. Please try again.');
+      toast({
+        title: "Login failed",
+        description: error.message || 'Please check your credentials and try again.',
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
