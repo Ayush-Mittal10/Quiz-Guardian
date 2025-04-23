@@ -2,21 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, Warning, JsonWarning } from '@/types';
-
-interface QuizAttempt {
-  id: string;
-  student: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  score: number;
-  timeSpent: number;
-  submittedAt: string;
-  autoSubmitted: boolean;
-  warnings: Warning[];
-}
+import { Quiz, Warning, QuizAttempt } from '@/types';
 
 export const useQuizResults = (quizId: string | undefined) => {
   const [loading, setLoading] = useState(true);
@@ -75,7 +61,16 @@ export const useQuizResults = (quizId: string | undefined) => {
             title: quizData.title,
             description: quizData.description || '',
             testId: quizData.test_id,
-            totalQuestions: questionCount || 0
+            createdBy: '',
+            createdAt: '',
+            settings: {
+              timeLimit: 0,
+              shuffleQuestions: false,
+              showResults: false,
+              monitoringEnabled: false,
+              allowedWarnings: 0
+            },
+            questions: []
           });
           setAttempts([]);
           return;
@@ -108,7 +103,16 @@ export const useQuizResults = (quizId: string | undefined) => {
           title: quizData.title,
           description: quizData.description || '',
           testId: quizData.test_id,
-          totalQuestions: questionCount || 0
+          createdBy: '',
+          createdAt: '',
+          settings: {
+            timeLimit: 0,
+            shuffleQuestions: false,
+            showResults: false,
+            monitoringEnabled: false,
+            allowedWarnings: 0
+          },
+          questions: []
         };
         
         const formattedAttempts: QuizAttempt[] = attemptsData.map(attempt => {
@@ -119,26 +123,36 @@ export const useQuizResults = (quizId: string | undefined) => {
           };
           
           const parsedWarnings: Warning[] = Array.isArray(attempt.warnings) 
-            ? attempt.warnings.map((warning: JsonWarning) => ({
+            ? attempt.warnings.map((warning: any) => ({
                 type: warning.type,
                 timestamp: warning.timestamp,
-                description: warning.description
+                description: warning.description || ''
               }))
             : [];
           
+          // Calculate time spent between start and submission time
+          const startTime = new Date(attempt.started_at).getTime();
+          const endTime = attempt.submitted_at ? new Date(attempt.submitted_at).getTime() : Date.now();
+          const timeSpent = Math.round((endTime - startTime) / 1000);
+          
           return {
             id: attempt.id,
-            student: studentProfile,
-            score: attempt.score || 0,
-            timeSpent: calculateTimeSpent(attempt.started_at, attempt.submitted_at),
-            submittedAt: attempt.submitted_at || attempt.started_at,
+            quizId: attempt.quiz_id,
+            studentId: attempt.student_id,
+            startedAt: attempt.started_at,
+            submittedAt: attempt.submitted_at || undefined,
+            answers: attempt.answers as Record<string, number[]> || {},
+            warnings: parsedWarnings,
             autoSubmitted: attempt.auto_submitted || false,
-            warnings: parsedWarnings
-          };
+            score: attempt.score || 0,
+            // Additional properties for UI rendering
+            student: studentProfile,
+            timeSpent: timeSpent
+          } as QuizAttempt & { student: any; timeSpent: number };
         });
         
         setQuiz(formattedQuiz);
-        setAttempts(formattedAttempts);
+        setAttempts(formattedAttempts as unknown as QuizAttempt[]);
       } catch (error: any) {
         console.error('Error fetching data:', error);
         toast({
@@ -153,12 +167,6 @@ export const useQuizResults = (quizId: string | undefined) => {
     
     fetchQuizAndAttempts();
   }, [quizId, toast]);
-
-  const calculateTimeSpent = (startTime: string, endTime?: string): number => {
-    const start = new Date(startTime).getTime();
-    const end = endTime ? new Date(endTime).getTime() : Date.now();
-    return Math.round((end - start) / 1000);
-  };
 
   return { loading, quiz, attempts };
 };

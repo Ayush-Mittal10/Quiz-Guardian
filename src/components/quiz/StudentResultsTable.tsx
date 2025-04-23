@@ -36,26 +36,26 @@ export const StudentResultsTable = ({
           {attempts.map((result) => (
             <TableRow
               key={result.id}
-              className={selectedStudent === result.student.id ? 'bg-blue-50' : ''}
-              onClick={() => onSelectStudent(result.student.id)}
+              className={selectedStudent === result.studentId ? 'bg-blue-50' : ''}
+              onClick={() => onSelectStudent(result.studentId)}
             >
               <TableCell>
-                <div>{result.student.name}</div>
-                <div className="text-xs text-muted-foreground">{result.student.email}</div>
+                <div>{result.student?.name || 'Unknown Student'}</div>
+                <div className="text-xs text-muted-foreground">{result.student?.email || ''}</div>
               </TableCell>
               <TableCell>
                 <div className={`font-medium ${
-                  result.score >= 70 ? 'text-green-600' :
-                  result.score >= 50 ? 'text-amber-600' : 'text-red-600'
+                  (result.score || 0) >= 70 ? 'text-green-600' :
+                  (result.score || 0) >= 50 ? 'text-amber-600' : 'text-red-600'
                 }`}>
-                  {result.score}%
+                  {result.score || 0}%
                 </div>
               </TableCell>
-              <TableCell>{formatTime(result.timeSpent)}</TableCell>
+              <TableCell>{result.timeSpent ? formatTime(result.timeSpent) : '00:00'}</TableCell>
               <TableCell>
-                <div>{new Date(result.submittedAt).toLocaleDateString()}</div>
+                <div>{result.submittedAt ? new Date(result.submittedAt).toLocaleDateString() : 'Not submitted'}</div>
                 <div className="text-xs text-muted-foreground">
-                  {new Date(result.submittedAt).toLocaleTimeString()}
+                  {result.submittedAt ? new Date(result.submittedAt).toLocaleTimeString() : ''}
                 </div>
               </TableCell>
               <TableCell>

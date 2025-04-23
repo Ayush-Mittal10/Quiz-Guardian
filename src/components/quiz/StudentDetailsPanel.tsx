@@ -15,7 +15,7 @@ export const StudentDetailsPanel = ({ attempt, onClose }: StudentDetailsPanelPro
   return (
     <Card className="mt-6">
       <CardHeader>
-        <CardTitle>Student Details: {attempt.student.name}</CardTitle>
+        <CardTitle>Student Details: {attempt.student?.name || 'Unknown Student'}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

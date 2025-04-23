@@ -1,3 +1,4 @@
+
 // User and authentication types
 export type UserRole = 'professor' | 'student';
 
@@ -57,6 +58,13 @@ export interface QuizAttempt {
   warnings: Warning[];
   autoSubmitted: boolean;
   score?: number;
+  // Extended properties for UI
+  student?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  timeSpent?: number;
 }
 
 // Add a specific type for JSON data from Supabase

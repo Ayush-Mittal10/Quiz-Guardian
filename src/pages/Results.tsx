@@ -54,7 +54,7 @@ const Results = () => {
 
           {selectedStudent && (
             <StudentDetailsPanel
-              attempt={attempts.find(a => a.student.id === selectedStudent)!}
+              attempt={attempts.find(a => a.studentId === selectedStudent)!}
               onClose={() => setSelectedStudent(null)}
             />
           )}
