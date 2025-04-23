@@ -165,9 +165,6 @@ export function RegisterForm() {
                     </RadioGroup>
                   </FormControl>
                   <FormMessage />
-                  <p className="text-sm text-muted-foreground">
-                    Role is automatically determined based on your email format
-                  </p>
                 </FormItem>
               )}
             />
