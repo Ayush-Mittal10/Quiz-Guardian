@@ -1,4 +1,3 @@
-
 // User and authentication types
 export type UserRole = 'professor' | 'student';
 
@@ -59,3 +58,10 @@ export interface QuizAttempt {
   autoSubmitted: boolean;
   score?: number;
 }
+
+// Add a specific type for JSON data from Supabase
+export type JsonWarning = {
+  type: 'tab-switch' | 'focus-loss' | 'multiple-faces' | 'no-face';
+  timestamp: string;
+  description?: string;
+};

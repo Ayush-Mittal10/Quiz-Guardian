@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Warning, JsonWarning } from '@/types';
 
 interface QuizAttempt {
   id: string;
@@ -94,6 +96,21 @@ const Results = () => {
         
         // Get student profiles separately
         const studentIds = attemptsData.map(attempt => attempt.student_id);
+        
+        if (studentIds.length === 0) {
+          // Handle case with no attempts
+          setQuiz({
+            id: quizData.id,
+            title: quizData.title,
+            description: quizData.description || '',
+            testId: quizData.test_id,
+            totalQuestions: questionCount || 0
+          });
+          setAttempts([]);
+          setLoading(false);
+          return;
+        }
+        
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select(`
@@ -104,21 +121,15 @@ const Results = () => {
           
         if (profilesError) throw profilesError;
         
-        // Get user emails separately
-        const { data: usersData, error: usersError } = await supabase
-          .auth.admin.listUsers({
-            perPage: 1000,
-          });
+        // Using the auth API to get emails is typically restricted
+        // Instead, we'll manage without emails for now
+        const profilesMap = new Map<string, ProfileResult>();
         
-        if (usersError) throw usersError;
-        
-        // Create a lookup map for profiles and emails
-        const profilesMap = new Map();
-        profilesData.forEach(profile => {
+        profilesData?.forEach(profile => {
           profilesMap.set(profile.id, {
             id: profile.id,
             name: profile.name,
-            email: usersData.users.find(u => u.id === profile.id)?.email || ''
+            email: '' // We won't have emails available through regular queries
           });
         });
         
@@ -138,6 +149,15 @@ const Results = () => {
             email: ''
           };
           
+          // Properly parse the warnings as Warning[] type
+          const parsedWarnings: Warning[] = Array.isArray(attempt.warnings) 
+            ? attempt.warnings.map((warning: JsonWarning) => ({
+                type: warning.type,
+                timestamp: warning.timestamp,
+                description: warning.description
+              }))
+            : [];
+          
           return {
             id: attempt.id,
             student: {
@@ -149,7 +169,7 @@ const Results = () => {
             timeSpent: calculateTimeSpent(attempt.started_at, attempt.submitted_at),
             submittedAt: attempt.submitted_at || attempt.started_at,
             autoSubmitted: attempt.auto_submitted || false,
-            warnings: attempt.warnings || []
+            warnings: parsedWarnings
           };
         });
         
