@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -21,12 +20,6 @@ interface QuizAttempt {
   submittedAt: string;
   autoSubmitted: boolean;
   warnings: Warning[];
-}
-
-interface Warning {
-  type: 'tab-switch' | 'focus-loss' | 'multiple-faces' | 'no-face';
-  timestamp: string;
-  description?: string;
 }
 
 interface Quiz {
