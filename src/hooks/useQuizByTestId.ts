@@ -55,13 +55,13 @@ export function useQuizByTestId(testId: string | undefined) {
         }));
         
         // Safely parse settings from JSON to our QuizSettings type
-        const rawSettings = quizData.settings;
+        const rawSettings = quizData.settings as Record<string, any>;
         const settings: QuizSettings = {
-          timeLimit: typeof rawSettings.timeLimit === 'number' ? rawSettings.timeLimit : 30,
-          shuffleQuestions: typeof rawSettings.shuffleQuestions === 'boolean' ? rawSettings.shuffleQuestions : true,
-          showResults: typeof rawSettings.showResults === 'boolean' ? rawSettings.showResults : true,
-          monitoringEnabled: typeof rawSettings.monitoringEnabled === 'boolean' ? rawSettings.monitoringEnabled : true,
-          allowedWarnings: typeof rawSettings.allowedWarnings === 'number' ? rawSettings.allowedWarnings : 3
+          timeLimit: typeof rawSettings?.timeLimit === 'number' ? rawSettings.timeLimit : 30,
+          shuffleQuestions: typeof rawSettings?.shuffleQuestions === 'boolean' ? rawSettings.shuffleQuestions : true,
+          showResults: typeof rawSettings?.showResults === 'boolean' ? rawSettings.showResults : true,
+          monitoringEnabled: typeof rawSettings?.monitoringEnabled === 'boolean' ? rawSettings.monitoringEnabled : true,
+          allowedWarnings: typeof rawSettings?.allowedWarnings === 'number' ? rawSettings.allowedWarnings : 3
         };
         
         const formattedQuiz: Quiz = {

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, Warning, QuizAttempt, JsonWarning, QuizSettings } from '@/types';
+import { Quiz, Warning, QuizAttempt, QuizSettings } from '@/types';
 
 export const useQuizResults = (quizId: string | undefined) => {
   const [loading, setLoading] = useState(true);
@@ -55,13 +55,13 @@ export const useQuizResults = (quizId: string | undefined) => {
         const studentIds = attemptsData.map(attempt => attempt.student_id);
         
         // Safely parse settings from JSON to our QuizSettings type
-        const rawSettings = quizData.settings;
+        const rawSettings = quizData.settings as Record<string, any>;
         const settings: QuizSettings = {
-          timeLimit: typeof rawSettings.timeLimit === 'number' ? rawSettings.timeLimit : 30,
-          shuffleQuestions: typeof rawSettings.shuffleQuestions === 'boolean' ? rawSettings.shuffleQuestions : true,
-          showResults: typeof rawSettings.showResults === 'boolean' ? rawSettings.showResults : true,
-          monitoringEnabled: typeof rawSettings.monitoringEnabled === 'boolean' ? rawSettings.monitoringEnabled : true,
-          allowedWarnings: typeof rawSettings.allowedWarnings === 'number' ? rawSettings.allowedWarnings : 3
+          timeLimit: typeof rawSettings?.timeLimit === 'number' ? rawSettings.timeLimit : 30,
+          shuffleQuestions: typeof rawSettings?.shuffleQuestions === 'boolean' ? rawSettings.shuffleQuestions : true,
+          showResults: typeof rawSettings?.showResults === 'boolean' ? rawSettings.showResults : true,
+          monitoringEnabled: typeof rawSettings?.monitoringEnabled === 'boolean' ? rawSettings.monitoringEnabled : true,
+          allowedWarnings: typeof rawSettings?.allowedWarnings === 'number' ? rawSettings.allowedWarnings : 3
         };
         
         if (studentIds.length === 0) {
@@ -121,11 +121,11 @@ export const useQuizResults = (quizId: string | undefined) => {
           };
           
           // Safely parse warnings from JSON to our Warning type
-          const rawWarnings = Array.isArray(attempt.warnings) ? attempt.warnings : [];
-          const parsedWarnings: Warning[] = rawWarnings.map((warning: any) => ({
-            type: warning.type || 'focus-loss',
-            timestamp: warning.timestamp || new Date().toISOString(),
-            description: warning.description || ''
+          const warningsArray = Array.isArray(attempt.warnings) ? attempt.warnings : [];
+          const parsedWarnings: Warning[] = warningsArray.map((warning: any) => ({
+            type: warning?.type || 'focus-loss',
+            timestamp: warning?.timestamp || new Date().toISOString(),
+            description: warning?.description || ''
           }));
           
           // Calculate time spent between start and submission time

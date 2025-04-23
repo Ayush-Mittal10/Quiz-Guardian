@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { QuizAttempt, JsonWarning, Warning } from '@/types';
+import { QuizAttempt, Warning } from '@/types';
 
 export function useStudentAttempts() {
   const { user } = useAuth();
@@ -46,11 +46,11 @@ export function useStudentAttempts() {
           const timeSpent = Math.round((endTime - startTime) / 1000); // in seconds
           
           // Safely process warnings with proper type handling
-          const rawWarnings = Array.isArray(attempt.warnings) ? attempt.warnings : [];
-          const warnings: Warning[] = rawWarnings.map((w: any) => ({
-            timestamp: w.timestamp || new Date().toISOString(),
-            type: w.type || 'focus-loss',
-            description: w.description || ''
+          const warningsArray = Array.isArray(attempt.warnings) ? attempt.warnings : [];
+          const warnings: Warning[] = warningsArray.map((w: any) => ({
+            timestamp: w?.timestamp || new Date().toISOString(),
+            type: w?.type || 'focus-loss',
+            description: w?.description || ''
           }));
           
           return {
