@@ -1,51 +1,25 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Quiz } from '@/types';
-
-// Mock quizzes data
-const mockQuizzes: Quiz[] = [
-  {
-    id: 'quiz-1',
-    title: 'Introduction to Computer Science',
-    description: 'Basic concepts of computer science and programming',
-    createdBy: 'user-123',
-    createdAt: '2023-05-15T10:30:00Z',
-    settings: {
-      timeLimit: 30,
-      shuffleQuestions: true,
-      showResults: true,
-      monitoringEnabled: true,
-      allowedWarnings: 3,
-    },
-    questions: [],
-    testId: 'CS101',
-  },
-  {
-    id: 'quiz-2',
-    title: 'Advanced Mathematics',
-    description: 'Calculus and linear algebra problems',
-    createdBy: 'user-123',
-    createdAt: '2023-05-20T14:15:00Z',
-    settings: {
-      timeLimit: 45,
-      shuffleQuestions: true,
-      showResults: false,
-      monitoringEnabled: true,
-      allowedWarnings: 2,
-    },
-    questions: [],
-    testId: 'MATH201',
-  },
-];
+import { useQuizzes } from '@/hooks/useQuizzes';
+import { useToast } from '@/hooks/use-toast';
 
 export function ProfessorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [quizzes] = useState<Quiz[]>(mockQuizzes);
+  const { data: quizzes, isLoading, isError } = useQuizzes();
+  const { toast } = useToast();
+
+  if (isError) {
+    toast({
+      title: "Error",
+      description: "Failed to load quizzes. Please try again later.",
+      variant: "destructive",
+    });
+  }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -60,7 +34,11 @@ export function ProfessorDashboard() {
       <div className="grid gap-6">
         <div>
           <h2 className="text-xl font-semibold mb-4">Your Quizzes</h2>
-          {quizzes.length === 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center p-6">
+              <p className="text-muted-foreground">Loading quizzes...</p>
+            </div>
+          ) : quizzes?.length === 0 ? (
             <Card>
               <CardContent className="pt-6">
                 <p className="text-center text-muted-foreground">
@@ -70,7 +48,7 @@ export function ProfessorDashboard() {
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {quizzes.map((quiz) => (
+              {quizzes?.map((quiz) => (
                 <Card key={quiz.id}>
                   <CardHeader>
                     <CardTitle>{quiz.title}</CardTitle>

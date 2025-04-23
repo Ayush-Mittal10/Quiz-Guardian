@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -14,6 +13,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { QuizQuestion, QuestionType } from '@/types';
+import { saveQuiz } from '@/utils/quizUtils';
+import { useToast } from '@/hooks/use-toast';
+import { QuizPublishedModal } from '@/components/quiz/QuizPublishedModal';
 
 const quizSettingsSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -30,6 +32,7 @@ type QuizSettingsFormValues = z.infer<typeof quizSettingsSchema>;
 const CreateQuiz = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('manual');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Partial<QuizQuestion>>({
@@ -42,6 +45,10 @@ const CreateQuiz = () => {
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [numQuestionsToGenerate, setNumQuestionsToGenerate] = useState<number>(3);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [publishedQuizId, setPublishedQuizId] = useState('');
+  const [publishedTestId, setPublishedTestId] = useState('');
 
   const form = useForm<QuizSettingsFormValues>({
     resolver: zodResolver(quizSettingsSchema),
@@ -172,20 +179,63 @@ const CreateQuiz = () => {
     }, 2000);
   };
 
-  const publishQuiz = (data: QuizSettingsFormValues) => {
-    if (questions.length === 0) {
-      return; // Validate that there are questions
+  const publishQuiz = async (data: QuizSettingsFormValues) => {
+    if (!user) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to publish a quiz",
+        variant: "destructive",
+      });
+      return;
     }
     
-    const testId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    console.log('Quiz published with Test ID:', testId, {
-      ...data,
-      questions,
-      createdBy: user?.id,
-      testId
-    });
+    if (questions.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "You must add at least one question to publish a quiz",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    navigate('/dashboard');
+    setIsSubmitting(true);
+    
+    try {
+      const result = await saveQuiz(
+        data.title,
+        data.description,
+        {
+          timeLimit: data.timeLimit,
+          shuffleQuestions: data.shuffleQuestions,
+          showResults: data.showResults,
+          monitoringEnabled: data.monitoringEnabled,
+          allowedWarnings: data.allowedWarnings
+        },
+        questions,
+        user.id
+      );
+      
+      if (result.success) {
+        setPublishedQuizId(result.id);
+        setPublishedTestId(result.testId);
+        setShowSuccessModal(true);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to publish quiz. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error publishing quiz:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -566,12 +616,19 @@ const CreateQuiz = () => {
               Cancel
             </Button>
             <Button 
-              onClick={() => publishQuiz(form.getValues())}
-              disabled={questions.length === 0 || !form.formState.isValid}
+              onClick={form.handleSubmit(publishQuiz)}
+              disabled={questions.length === 0 || !form.formState.isValid || isSubmitting}
             >
-              Publish Quiz
+              {isSubmitting ? "Publishing..." : "Publish Quiz"}
             </Button>
           </div>
+          
+          <QuizPublishedModal
+            open={showSuccessModal}
+            onOpenChange={setShowSuccessModal}
+            testId={publishedTestId}
+            quizId={publishedQuizId}
+          />
         </div>
       </main>
     </div>
