@@ -18,7 +18,7 @@ export async function saveQuiz(
       .insert({
         title,
         description,
-        settings: settings as any, // Cast to any to satisfy TypeScript
+        settings: settings as any,
         created_by: userId,
         test_id: testId
       })
