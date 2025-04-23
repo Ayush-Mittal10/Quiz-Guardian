@@ -1,0 +1,97 @@
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { QuizAttempt } from '@/types';
+
+interface StudentResultsTableProps {
+  attempts: QuizAttempt[];
+  selectedStudent: string | null;
+  onSelectStudent: (studentId: string) => void;
+}
+
+export const StudentResultsTable = ({
+  attempts,
+  selectedStudent,
+  onSelectStudent,
+}: StudentResultsTableProps) => {
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Student</TableHead>
+            <TableHead>Score</TableHead>
+            <TableHead>Time Spent</TableHead>
+            <TableHead>Submitted</TableHead>
+            <TableHead>Warnings</TableHead>
+            <TableHead>Integrity</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {attempts.map((result) => (
+            <TableRow
+              key={result.id}
+              className={selectedStudent === result.student.id ? 'bg-blue-50' : ''}
+              onClick={() => onSelectStudent(result.student.id)}
+            >
+              <TableCell>
+                <div>{result.student.name}</div>
+                <div className="text-xs text-muted-foreground">{result.student.email}</div>
+              </TableCell>
+              <TableCell>
+                <div className={`font-medium ${
+                  result.score >= 70 ? 'text-green-600' :
+                  result.score >= 50 ? 'text-amber-600' : 'text-red-600'
+                }`}>
+                  {result.score}%
+                </div>
+              </TableCell>
+              <TableCell>{formatTime(result.timeSpent)}</TableCell>
+              <TableCell>
+                <div>{new Date(result.submittedAt).toLocaleDateString()}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(result.submittedAt).toLocaleTimeString()}
+                </div>
+              </TableCell>
+              <TableCell>
+                {result.warnings && result.warnings.length > 0 ? (
+                  <span className="text-red-500">{result.warnings.length}</span>
+                ) : (
+                  <span className="text-green-500">0</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {result.autoSubmitted ? (
+                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                    Auto-submitted
+                  </span>
+                ) : result.warnings && result.warnings.length > 0 ? (
+                  <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
+                    Warning
+                  </span>
+                ) : (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                    Good
+                  </span>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+
+          {attempts.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                No quiz attempts found
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
