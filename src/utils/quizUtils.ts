@@ -27,7 +27,13 @@ export async function saveQuiz(
       .single();
     
     if (quizError) {
-      throw quizError;
+      console.error('Error creating quiz:', quizError);
+      return {
+        success: false,
+        id: '',
+        testId: '',
+        error: quizError
+      };
     }
 
     // Insert all questions
@@ -46,7 +52,13 @@ export async function saveQuiz(
         .insert(questionsToInsert);
       
       if (questionsError) {
-        throw questionsError;
+        console.error('Error inserting questions:', questionsError);
+        return {
+          success: false,
+          id: quizData.id,
+          testId,
+          error: questionsError
+        };
       }
     }
 

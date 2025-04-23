@@ -220,11 +220,16 @@ const CreateQuiz = () => {
         setPublishedTestId(result.testId);
         setShowSuccessModal(true);
       } else {
+        const errorMessage = result.error?.message || "Failed to publish quiz. Please try again later.";
+        const errorCode = result.error?.code ? ` (Error code: ${result.error.code})` : "";
+        
         toast({
           title: "Error",
-          description: "Failed to publish quiz. Please try again later.",
+          description: `${errorMessage}${errorCode}`,
           variant: "destructive",
         });
+        
+        console.error('Quiz publishing failed:', result.error);
       }
     } catch (error) {
       console.error('Error publishing quiz:', error);
