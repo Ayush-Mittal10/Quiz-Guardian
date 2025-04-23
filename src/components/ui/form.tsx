@@ -52,12 +52,19 @@ const useFormField = () => {
   const { id } = itemContext
 
   if (!formContext) {
+    // Add error property with null value to match the expected shape
     return {
       id,
       name: fieldContext.name,
       formItemId: `${id}-form-item`,
       formDescriptionId: `${id}-form-item-description`,
       formMessageId: `${id}-form-item-message`,
+      // Add these properties to match the shape when formContext exists
+      error: undefined,
+      invalid: false,
+      isDirty: false,
+      isTouched: false,
+      isValidating: false
     }
   }
 
