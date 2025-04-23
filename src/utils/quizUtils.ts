@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, QuizQuestion, QuizSettings } from '@/types';
+import { Quiz, QuizQuestion, QuizSettings, Warning } from '@/types';
 
 export async function saveQuiz(
   title: string, 
@@ -73,6 +73,79 @@ export async function saveQuiz(
       success: false,
       id: '',
       testId: '',
+      error
+    };
+  }
+}
+
+export async function saveQuizAttempt(
+  quizId: string,
+  studentId: string,
+  answers: Record<string, number[]>,
+  warnings: Warning[] = [],
+  autoSubmitted: boolean = false
+): Promise<{ success: boolean; id: string; error?: any }> {
+  try {
+    // First, calculate the score by comparing answers with correct answers
+    const { data: questions, error: questionsError } = await supabase
+      .from('questions')
+      .select('id, correct_answers, points')
+      .eq('quiz_id', quizId);
+    
+    if (questionsError) {
+      throw questionsError;
+    }
+    
+    // Calculate the score
+    let totalScore = 0;
+    let totalPossibleScore = 0;
+    
+    questions.forEach((question: any) => {
+      totalPossibleScore += question.points;
+      
+      const studentAnswers = answers[question.id] || [];
+      const correctAnswers = question.correct_answers || [];
+      
+      // For a perfect match (all correct options selected and no incorrect ones)
+      if (
+        studentAnswers.length === correctAnswers.length &&
+        studentAnswers.every(answer => correctAnswers.includes(answer))
+      ) {
+        totalScore += question.points;
+      }
+    });
+    
+    // Calculate percentage score (rounded to nearest integer)
+    const scorePercentage = Math.round((totalScore / totalPossibleScore) * 100);
+    
+    // Insert the attempt
+    const { data: attemptData, error: attemptError } = await supabase
+      .from('quiz_attempts')
+      .insert({
+        quiz_id: quizId,
+        student_id: studentId,
+        answers: answers,
+        warnings: warnings,
+        auto_submitted: autoSubmitted,
+        score: scorePercentage,
+        submitted_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (attemptError) {
+      throw attemptError;
+    }
+    
+    return {
+      success: true,
+      id: attemptData.id
+    };
+  } catch (error: any) {
+    console.error('Error saving quiz attempt:', error);
+    return {
+      success: false,
+      id: '',
       error
     };
   }

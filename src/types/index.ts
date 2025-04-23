@@ -65,6 +65,8 @@ export interface QuizAttempt {
     email: string;
   };
   timeSpent?: number;
+  quizTitle?: string;
+  testId?: string;
 }
 
 // Add a specific type for JSON data from Supabase

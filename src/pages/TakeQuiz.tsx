@@ -7,73 +7,40 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { Quiz, QuizQuestion, Warning } from '@/types';
-
-// Mock quiz data
-const mockQuiz: Quiz = {
-  id: 'quiz-1',
-  title: 'Introduction to Computer Science',
-  description: 'Basic concepts of computer science and programming',
-  createdBy: 'user-123',
-  createdAt: '2023-05-15T10:30:00Z',
-  settings: {
-    timeLimit: 30,
-    shuffleQuestions: true,
-    showResults: true,
-    monitoringEnabled: true,
-    allowedWarnings: 3,
-  },
-  questions: [
-    {
-      id: 'q1',
-      text: 'What does CPU stand for?',
-      type: 'single-choice',
-      options: [
-        'Central Processing Unit',
-        'Computer Personal Unit',
-        'Central Processor Underlying',
-        'Central Program Utility',
-      ],
-      correctAnswers: [0],
-      points: 1,
-    },
-    {
-      id: 'q2',
-      text: 'Which of the following are programming languages? (Select all that apply)',
-      type: 'multiple-choice',
-      options: ['Python', 'HTML', 'Java', 'Binary'],
-      correctAnswers: [0, 2],
-      points: 2,
-    },
-    {
-      id: 'q3',
-      text: 'Which data structure operates on a First-In-First-Out (FIFO) principle?',
-      type: 'single-choice',
-      options: ['Stack', 'Queue', 'Tree', 'Heap'],
-      correctAnswers: [1],
-      points: 1,
-    },
-  ],
-  testId: 'CS101',
-};
+import { useQuizByTestId } from '@/hooks/useQuizByTestId';
+import { saveQuizAttempt } from '@/utils/quizUtils';
+import { useToast } from '@/components/ui/use-toast';
 
 const TakeQuiz = () => {
   const { testId } = useParams<{ testId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [quiz] = useState<Quiz>(mockQuiz);
+  const { toast } = useToast();
+  const { quiz, isLoading, error } = useQuizByTestId(testId);
+  
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
-  const [timeLeft, setTimeLeft] = useState(quiz.settings.timeLimit * 60); // in seconds
+  const [timeLeft, setTimeLeft] = useState(0);
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [isAlertVisible, setIsAlertVisible] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Set the timer when quiz loads
+  useEffect(() => {
+    if (quiz) {
+      setTimeLeft(quiz.settings.timeLimit * 60); // in seconds
+    }
+  }, [quiz]);
   
   // Start camera feed
   useEffect(() => {
     let stream: MediaStream | null = null;
     
     const startCamera = async () => {
+      if (!quiz?.settings.monitoringEnabled) return;
+      
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
         if (videoRef.current) {
@@ -85,7 +52,7 @@ const TakeQuiz = () => {
       }
     };
     
-    if (quiz.settings.monitoringEnabled) {
+    if (quiz) {
       startCamera();
     }
     
@@ -94,10 +61,12 @@ const TakeQuiz = () => {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [quiz.settings.monitoringEnabled]);
+  }, [quiz]);
   
   // Timer countdown
   useEffect(() => {
+    if (!quiz || timeLeft <= 0) return;
+    
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -110,10 +79,12 @@ const TakeQuiz = () => {
     }, 1000);
     
     return () => clearInterval(timer);
-  }, []);
+  }, [quiz, timeLeft]);
   
   // Monitor tab/window focus
   useEffect(() => {
+    if (!quiz?.settings.monitoringEnabled) return;
+    
     const handleVisibilityChange = () => {
       if (document.hidden) {
         addWarning('tab-switch', 'Tab change detected');
@@ -124,16 +95,14 @@ const TakeQuiz = () => {
       addWarning('focus-loss', 'Window focus lost');
     };
     
-    if (quiz.settings.monitoringEnabled) {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('blur', handleFocusLoss);
-    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleFocusLoss);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleFocusLoss);
     };
-  }, [quiz.settings.monitoringEnabled]);
+  }, [quiz]);
   
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -142,6 +111,8 @@ const TakeQuiz = () => {
   };
   
   const addWarning = (type: 'tab-switch' | 'focus-loss' | 'multiple-faces' | 'no-face', description: string) => {
+    if (!quiz) return;
+    
     const newWarning: Warning = {
       timestamp: new Date().toISOString(),
       type,
@@ -166,6 +137,8 @@ const TakeQuiz = () => {
   };
   
   const handleAnswerChange = (questionId: string, optionIndex: number, checked: boolean) => {
+    if (!quiz) return;
+    
     const question = quiz.questions.find(q => q.id === questionId);
     
     if (!question) return;
@@ -194,10 +167,8 @@ const TakeQuiz = () => {
     }
   };
   
-  const currentQuestion = quiz.questions[currentQuestionIndex];
-  
   const goToNextQuestion = () => {
-    if (currentQuestionIndex < quiz.questions.length - 1) {
+    if (quiz && currentQuestionIndex < quiz.questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
@@ -208,24 +179,82 @@ const TakeQuiz = () => {
     }
   };
   
-  const submitQuiz = (autoSubmitted: boolean = false) => {
-    // In a real app, this would submit to the server
-    console.log('Quiz submitted', {
-      quizId: quiz.id,
-      studentId: user?.id,
-      answers,
-      warnings,
-      autoSubmitted,
-    });
+  const submitQuiz = async (autoSubmitted: boolean = false) => {
+    if (!quiz || !user || submitting) return;
     
-    navigate('/quiz-submitted', { 
-      state: { 
-        quizId: quiz.id,
-        autoSubmitted,
-        warnings: warnings.length,
-      } 
-    });
+    setSubmitting(true);
+    
+    try {
+      const result = await saveQuizAttempt(
+        quiz.id,
+        user.id,
+        answers,
+        warnings,
+        autoSubmitted
+      );
+      
+      if (result.success) {
+        navigate('/quiz-submitted', { 
+          state: { 
+            quizId: quiz.id,
+            quizTitle: quiz.title,
+            autoSubmitted,
+            warnings: warnings.length,
+          }
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to submit quiz. Please try again.",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+      }
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+    }
   };
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-xl">Loading quiz...</div>
+      </div>
+    );
+  }
+  
+  if (error || !quiz) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-bold mb-4">Error Loading Quiz</h1>
+          <p className="text-muted-foreground mb-6">{error || "Quiz not found"}</p>
+          <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
+        </div>
+      </div>
+    );
+  }
+  
+  // No questions available
+  if (quiz.questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-bold mb-4">No Questions Available</h1>
+          <p className="text-muted-foreground mb-6">This quiz doesn't have any questions yet.</p>
+          <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
+        </div>
+      </div>
+    );
+  }
+  
+  const currentQuestion = quiz.questions[currentQuestionIndex];
   
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -318,8 +347,11 @@ const TakeQuiz = () => {
                       Next
                     </Button>
                   ) : (
-                    <Button onClick={() => submitQuiz(false)}>
-                      Submit Quiz
+                    <Button 
+                      onClick={() => submitQuiz(false)}
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Submitting...' : 'Submit Quiz'}
                     </Button>
                   )}
                 </div>
@@ -331,18 +363,22 @@ const TakeQuiz = () => {
           <div className="md:col-span-1">
             <Card>
               <CardContent className="p-4">
-                <h3 className="text-sm font-medium mb-2">Monitoring</h3>
-                <div className="rounded-md overflow-hidden bg-black mb-2">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    className="w-full h-auto"
-                  />
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Stay in front of your camera and keep this window active.
-                </div>
+                {quiz.settings.monitoringEnabled && (
+                  <>
+                    <h3 className="text-sm font-medium mb-2">Monitoring</h3>
+                    <div className="rounded-md overflow-hidden bg-black mb-2">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        className="w-full h-auto"
+                      />
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Stay in front of your camera and keep this window active.
+                    </div>
+                  </>
+                )}
                 
                 <div className="mt-4">
                   <h3 className="text-sm font-medium mb-2">Question Navigator</h3>
@@ -350,9 +386,10 @@ const TakeQuiz = () => {
                     {quiz.questions.map((_, index) => (
                       <Button
                         key={index}
-                        variant={currentQuestionIndex === index ? "default" : "outline"}
+                        variant={currentQuestionIndex === index ? "default" : 
+                          answers[quiz.questions[index].id] ? "outline" : "secondary"}
                         size="sm"
-                        className="h-8 w-8 p-0"
+                        className={`h-8 w-8 p-0 ${answers[quiz.questions[index].id] ? "border-green-500" : ""}`}
                         onClick={() => setCurrentQuestionIndex(index)}
                       >
                         {index + 1}

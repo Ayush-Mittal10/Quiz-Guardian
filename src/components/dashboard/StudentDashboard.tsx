@@ -1,49 +1,19 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { QuizAttempt } from '@/types';
-
-// Mock quiz attempts data
-const mockAttempts: QuizAttempt[] = [
-  {
-    id: 'attempt-1',
-    quizId: 'quiz-1',
-    studentId: 'user-456',
-    startedAt: '2023-05-16T09:45:00Z',
-    submittedAt: '2023-05-16T10:15:00Z',
-    answers: {},
-    warnings: [],
-    autoSubmitted: false,
-    score: 85,
-  },
-  {
-    id: 'attempt-2',
-    quizId: 'quiz-2',
-    studentId: 'user-456',
-    startedAt: '2023-05-21T13:30:00Z',
-    submittedAt: '2023-05-21T14:10:00Z',
-    answers: {},
-    warnings: [
-      {
-        timestamp: '2023-05-21T13:45:00Z',
-        type: 'tab-switch',
-        description: 'Tab change detected',
-      },
-    ],
-    autoSubmitted: false,
-    score: 72,
-  },
-];
+import { useStudentAttempts } from '@/hooks/useStudentAttempts';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatDistanceToNow } from 'date-fns';
 
 export function StudentDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [testId, setTestId] = useState('');
-  const [attempts] = useState<QuizAttempt[]>(mockAttempts);
+  const { attempts, isLoading } = useStudentAttempts();
 
   const handleJoinQuiz = () => {
     if (testId.trim()) {
@@ -77,7 +47,13 @@ export function StudentDashboard() {
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Quiz History</h2>
-        {attempts.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : attempts.length === 0 ? (
           <Card>
             <CardContent className="pt-6">
               <p className="text-center text-muted-foreground">
@@ -102,17 +78,19 @@ export function StudentDashboard() {
                 {attempts.map((attempt) => (
                   <tr key={attempt.id} className="border-b border-muted">
                     <td className="p-2">
-                      {attempt.quizId === 'quiz-1'
-                        ? 'Introduction to Computer Science'
-                        : 'Advanced Mathematics'}
+                      {attempt.quizTitle || "Unknown Quiz"}
                     </td>
                     <td className="p-2">
-                      {new Date(attempt.startedAt).toLocaleDateString()}
+                      {attempt.startedAt ? 
+                        formatDistanceToNow(new Date(attempt.startedAt), { addSuffix: true }) : 
+                        'Unknown date'}
                     </td>
-                    <td className="p-2">{attempt.score}%</td>
-                    <td className="p-2">{attempt.warnings.length}</td>
+                    <td className="p-2">{attempt.score !== undefined ? `${attempt.score}%` : 'Pending'}</td>
+                    <td className="p-2">{attempt.warnings?.length || 0}</td>
                     <td className="p-2">
-                      {attempt.autoSubmitted ? (
+                      {!attempt.submittedAt ? (
+                        <span className="text-amber-600">In Progress</span>
+                      ) : attempt.autoSubmitted ? (
                         <span className="text-destructive">Auto-submitted</span>
                       ) : (
                         <span className="text-green-600">Completed</span>
