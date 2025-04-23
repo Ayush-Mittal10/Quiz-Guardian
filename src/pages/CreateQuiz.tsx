@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -40,6 +39,7 @@ const CreateQuiz = () => {
   });
   const [aiPrompt, setAiPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [numQuestionsToGenerate, setNumQuestionsToGenerate] = useState<number>(3);
 
   const form = useForm<QuizSettingsFormValues>({
     resolver: zodResolver(quizSettingsSchema),
@@ -65,7 +65,6 @@ const CreateQuiz = () => {
     const newOptions = [...(currentQuestion.options || [])];
     newOptions.splice(index, 1);
     
-    // Update correct answers if needed
     let newCorrectAnswers = [...(currentQuestion.correctAnswers || [])];
     newCorrectAnswers = newCorrectAnswers.filter(ansIndex => ansIndex !== index)
       .map(ansIndex => ansIndex > index ? ansIndex - 1 : ansIndex);
@@ -91,13 +90,11 @@ const CreateQuiz = () => {
     const existingIndex = correctAnswers.indexOf(index);
     
     if (currentQuestion.type === 'single-choice') {
-      // For single choice, replace the correct answer
       setCurrentQuestion({
         ...currentQuestion,
         correctAnswers: [index]
       });
     } else {
-      // For multiple choice, toggle the selection
       if (existingIndex >= 0) {
         correctAnswers.splice(existingIndex, 1);
       } else {
@@ -139,55 +136,33 @@ const CreateQuiz = () => {
     setQuestions(questions.filter(q => q.id !== id));
   };
 
+  const updateQuestionPoints = (questionId: string, points: number) => {
+    setQuestions(questions.map(q => 
+      q.id === questionId 
+        ? { ...q, points: Math.max(1, points) } 
+        : q
+    ));
+  };
+
   const generateQuestionsWithAI = async () => {
-    if (!aiPrompt) return;
+    if (!aiPrompt || numQuestionsToGenerate < 1) return;
     
     setIsGenerating(true);
     
-    // In a real app, this would call an LLM API
     setTimeout(() => {
-      // Mock AI-generated questions
-      const mockGeneratedQuestions: QuizQuestion[] = [
-        {
-          id: `q-${Date.now()}-1`,
-          text: `What is the main concept of ${aiPrompt}?`,
-          type: 'single-choice',
-          options: [
-            `The principle theory of ${aiPrompt}`,
-            `The practical application of ${aiPrompt}`,
-            `The historical development of ${aiPrompt}`,
-            `The future implications of ${aiPrompt}`
-          ],
-          correctAnswers: [0],
-          points: 2
-        },
-        {
-          id: `q-${Date.now()}-2`,
-          text: `Which of the following are key components of ${aiPrompt}? (Select all that apply)`,
-          type: 'multiple-choice',
-          options: [
-            'Theoretical frameworks',
-            'Practical methodologies',
-            'Historical contexts',
-            'Future projections'
-          ],
-          correctAnswers: [0, 1],
-          points: 3
-        },
-        {
-          id: `q-${Date.now()}-3`,
-          text: `Who is generally credited with pioneering work in ${aiPrompt}?`,
-          type: 'single-choice',
-          options: [
-            'Early researchers in the field',
-            'Modern practitioners',
-            'Interdisciplinary collaborators',
-            'Academic institutions'
-          ],
-          correctAnswers: [0],
-          points: 1
-        },
-      ];
+      const mockGeneratedQuestions: QuizQuestion[] = Array(numQuestionsToGenerate).fill(null).map((_, index) => ({
+        id: `q-${Date.now()}-${index}`,
+        text: `What is the main concept of ${aiPrompt}?`,
+        type: 'single-choice',
+        options: [
+          `The principle theory of ${aiPrompt}`,
+          `The practical application of ${aiPrompt}`,
+          `The historical development of ${aiPrompt}`,
+          `The future implications of ${aiPrompt}`
+        ],
+        correctAnswers: [0],
+        points: 2
+      }));
       
       setQuestions([...questions, ...mockGeneratedQuestions]);
       setAiPrompt('');
@@ -200,7 +175,6 @@ const CreateQuiz = () => {
       return; // Validate that there are questions
     }
     
-    // In a real app, this would save to a database
     const testId = Math.random().toString(36).substring(2, 8).toUpperCase();
     console.log('Quiz published with Test ID:', testId, {
       ...data,
@@ -209,7 +183,6 @@ const CreateQuiz = () => {
       testId
     });
     
-    // Navigate to dashboard after publishing
     navigate('/dashboard');
   };
 
@@ -485,6 +458,21 @@ const CreateQuiz = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Number of Questions</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={numQuestionsToGenerate}
+                              onChange={(e) => setNumQuestionsToGenerate(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                            />
+                            <p className="text-sm text-muted-foreground">
+                              Generate between 1 and 10 questions
+                            </p>
+                          </div>
+                        </div>
                         <Textarea
                           placeholder="e.g., Photosynthesis, Chemical reactions, World War II"
                           value={aiPrompt}
@@ -520,10 +508,17 @@ const CreateQuiz = () => {
                             <CardTitle className="text-base">
                               {qIndex + 1}. {question.text}
                             </CardTitle>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">
-                                {question.points} {question.points === 1 ? 'point' : 'points'}
-                              </span>
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2">
+                                <Label>Points:</Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={question.points}
+                                  onChange={(e) => updateQuestionPoints(question.id, parseInt(e.target.value) || 1)}
+                                  className="w-20"
+                                />
+                              </div>
                               <Button 
                                 variant="destructive" 
                                 size="sm"
