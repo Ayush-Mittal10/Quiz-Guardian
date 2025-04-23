@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -62,7 +61,7 @@ export const EditQuizForm = ({ quiz }: EditQuizFormProps) => {
         .update({
           title: data.title,
           description: data.description,
-          settings,
+          settings: settings as any,
           updated_at: new Date().toISOString(),
         })
         .eq('id', quiz.id);
