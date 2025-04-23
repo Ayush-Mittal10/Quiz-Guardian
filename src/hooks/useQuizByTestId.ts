@@ -54,8 +54,15 @@ export function useQuizByTestId(testId: string | undefined) {
           points: q.points
         }));
         
-        // Type assertion for settings to ensure it conforms to our QuizSettings type
-        const settings = quizData.settings as QuizSettings;
+        // Safely parse settings from JSON to our QuizSettings type
+        const rawSettings = quizData.settings;
+        const settings: QuizSettings = {
+          timeLimit: typeof rawSettings.timeLimit === 'number' ? rawSettings.timeLimit : 30,
+          shuffleQuestions: typeof rawSettings.shuffleQuestions === 'boolean' ? rawSettings.shuffleQuestions : true,
+          showResults: typeof rawSettings.showResults === 'boolean' ? rawSettings.showResults : true,
+          monitoringEnabled: typeof rawSettings.monitoringEnabled === 'boolean' ? rawSettings.monitoringEnabled : true,
+          allowedWarnings: typeof rawSettings.allowedWarnings === 'number' ? rawSettings.allowedWarnings : 3
+        };
         
         const formattedQuiz: Quiz = {
           id: quizData.id,

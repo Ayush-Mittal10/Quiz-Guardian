@@ -119,7 +119,7 @@ export async function saveQuizAttempt(
     const scorePercentage = Math.round((totalScore / totalPossibleScore) * 100);
     
     // Convert warnings to JsonWarning format for database storage
-    const jsonWarnings: JsonWarning[] = warnings.map(warning => ({
+    const jsonWarnings: Record<string, any>[] = warnings.map(warning => ({
       type: warning.type,
       timestamp: warning.timestamp,
       description: warning.description

@@ -45,11 +45,11 @@ export function useStudentAttempts() {
           const endTime = attempt.submitted_at ? new Date(attempt.submitted_at).getTime() : Date.now();
           const timeSpent = Math.round((endTime - startTime) / 1000); // in seconds
           
-          // Process warnings with proper type handling
-          const jsonWarnings: JsonWarning[] = Array.isArray(attempt.warnings) ? attempt.warnings : [];
-          const warnings: Warning[] = jsonWarnings.map(w => ({
-            timestamp: w.timestamp,
-            type: w.type,
+          // Safely process warnings with proper type handling
+          const rawWarnings = Array.isArray(attempt.warnings) ? attempt.warnings : [];
+          const warnings: Warning[] = rawWarnings.map((w: any) => ({
+            timestamp: w.timestamp || new Date().toISOString(),
+            type: w.type || 'focus-loss',
             description: w.description || ''
           }));
           

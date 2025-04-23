@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, Warning, QuizAttempt, JsonWarning } from '@/types';
+import { Quiz, Warning, QuizAttempt, JsonWarning, QuizSettings } from '@/types';
 
 export const useQuizResults = (quizId: string | undefined) => {
   const [loading, setLoading] = useState(true);
@@ -54,6 +54,16 @@ export const useQuizResults = (quizId: string | undefined) => {
         // Get student profiles separately
         const studentIds = attemptsData.map(attempt => attempt.student_id);
         
+        // Safely parse settings from JSON to our QuizSettings type
+        const rawSettings = quizData.settings;
+        const settings: QuizSettings = {
+          timeLimit: typeof rawSettings.timeLimit === 'number' ? rawSettings.timeLimit : 30,
+          shuffleQuestions: typeof rawSettings.shuffleQuestions === 'boolean' ? rawSettings.shuffleQuestions : true,
+          showResults: typeof rawSettings.showResults === 'boolean' ? rawSettings.showResults : true,
+          monitoringEnabled: typeof rawSettings.monitoringEnabled === 'boolean' ? rawSettings.monitoringEnabled : true,
+          allowedWarnings: typeof rawSettings.allowedWarnings === 'number' ? rawSettings.allowedWarnings : 3
+        };
+        
         if (studentIds.length === 0) {
           // Handle case with no attempts
           setQuiz({
@@ -63,7 +73,7 @@ export const useQuizResults = (quizId: string | undefined) => {
             testId: quizData.test_id,
             createdBy: '',
             createdAt: '',
-            settings: quizData.settings,
+            settings: settings,
             questions: []
           });
           setAttempts([]);
@@ -99,7 +109,7 @@ export const useQuizResults = (quizId: string | undefined) => {
           testId: quizData.test_id,
           createdBy: '',
           createdAt: '',
-          settings: quizData.settings,
+          settings: settings,
           questions: []
         };
         
@@ -110,11 +120,11 @@ export const useQuizResults = (quizId: string | undefined) => {
             email: ''
           };
           
-          // Convert JSON warnings to our Warning type
-          const jsonWarnings: JsonWarning[] = Array.isArray(attempt.warnings) ? attempt.warnings : [];
-          const parsedWarnings: Warning[] = jsonWarnings.map(warning => ({
-            type: warning.type,
-            timestamp: warning.timestamp,
+          // Safely parse warnings from JSON to our Warning type
+          const rawWarnings = Array.isArray(attempt.warnings) ? attempt.warnings : [];
+          const parsedWarnings: Warning[] = rawWarnings.map((warning: any) => ({
+            type: warning.type || 'focus-loss',
+            timestamp: warning.timestamp || new Date().toISOString(),
             description: warning.description || ''
           }));
           
