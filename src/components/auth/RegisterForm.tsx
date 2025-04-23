@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,6 +27,11 @@ const registerSchema = z.object({
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
+const determineRoleFromEmail = (email: string): UserRole => {
+  const hasNumbers = /\d/.test(email.split('@')[0]);
+  return hasNumbers ? 'student' : 'professor';
+};
+
 export function RegisterForm() {
   const { register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +48,15 @@ export function RegisterForm() {
       role: 'student',
     },
   });
+
+  const email = form.watch('email');
+
+  useEffect(() => {
+    if (email && email.endsWith('.edu')) {
+      const role = determineRoleFromEmail(email);
+      form.setValue('role', role);
+    }
+  }, [email, form]);
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
@@ -90,7 +103,13 @@ export function RegisterForm() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="name@university.edu" {...field} />
+                    <Input 
+                      placeholder="name@university.edu" 
+                      {...field} 
+                      onChange={(e) => {
+                        field.onChange(e);
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -131,20 +150,24 @@ export function RegisterForm() {
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                       className="flex flex-col space-y-1"
+                      disabled={true}
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="student" id="student" />
-                        <label htmlFor="student" className="cursor-pointer">Student</label>
+                        <label htmlFor="student" className="cursor-not-allowed">Student</label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="professor" id="professor" />
-                        <label htmlFor="professor" className="cursor-pointer">Professor</label>
+                        <label htmlFor="professor" className="cursor-not-allowed">Professor</label>
                       </div>
                     </RadioGroup>
                   </FormControl>
                   <FormMessage />
+                  <p className="text-sm text-muted-foreground">
+                    Role is automatically determined based on your email format
+                  </p>
                 </FormItem>
               )}
             />
