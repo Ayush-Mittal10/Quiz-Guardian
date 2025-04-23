@@ -32,9 +32,15 @@ export function useQuizByTestId(testId: string | undefined) {
             settings
           `)
           .eq('test_id', testId.toUpperCase())
-          .single();
+          .maybeSingle(); // Change from single() to maybeSingle() to handle the case where no quiz is found
         
         if (quizError) throw quizError;
+        
+        if (!quizData) {
+          setError(`No quiz found with test ID: ${testId}`);
+          setIsLoading(false);
+          return;
+        }
         
         // Fetch questions for this quiz
         const { data: questionsData, error: questionsError } = await supabase
