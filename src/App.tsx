@@ -42,6 +42,11 @@ const App = () => (
                 <CreateQuiz />
               </ProtectedRoute>
             } />
+            <Route path="/edit-quiz/:quizId" element={
+              <ProtectedRoute allowedRoles={['professor']}>
+                <EditQuiz />
+              </ProtectedRoute>
+            } />
             <Route path="/monitor-quiz/:quizId" element={
               <ProtectedRoute allowedRoles={['professor']}>
                 <MonitorQuiz />

@@ -2,14 +2,18 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuizzes } from '@/hooks/useQuizzes';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function ProfessorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: quizzes, isLoading, isError, error } = useQuizzes();
 
   // Use useEffect to show toast on error instead of doing it directly in render
@@ -20,6 +24,24 @@ export function ProfessorDashboard() {
       });
     }
   }, [isError, error]);
+
+  const handleQuizActivation = async (quizId: string, currentState: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('quizzes')
+        .update({ is_active: !currentState })
+        .eq('id', quizId);
+
+      if (error) throw error;
+
+      toast.success(currentState ? 'Quiz deactivated' : 'Quiz activated');
+      queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+    } catch (err) {
+      toast.error('Failed to update quiz status', {
+        description: 'Please try again later.',
+      });
+    }
+  };
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -59,8 +81,16 @@ export function ProfessorDashboard() {
               {quizzes?.map((quiz) => (
                 <Card key={quiz.id}>
                   <CardHeader>
-                    <CardTitle>{quiz.title}</CardTitle>
-                    <CardDescription>Test ID: {quiz.testId}</CardDescription>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{quiz.title}</CardTitle>
+                        <CardDescription>Test ID: {quiz.testId}</CardDescription>
+                      </div>
+                      <Switch
+                        checked={quiz.isActive}
+                        onCheckedChange={() => handleQuizActivation(quiz.id, quiz.isActive || false)}
+                      />
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm">{quiz.description}</p>

@@ -19,7 +19,8 @@ export function useQuizzes() {
         created_at,
         created_by,
         test_id,
-        settings
+        settings,
+        is_active
       `)
       .eq('created_by', user.id);
       
@@ -34,9 +35,10 @@ export function useQuizzes() {
       description: quiz.description || '',
       createdBy: quiz.created_by,
       createdAt: quiz.created_at,
-      settings: quiz.settings as unknown as QuizSettings, // Type assertion to convert Json to QuizSettings
-      questions: [], // We'll fetch questions separately when needed
-      testId: quiz.test_id
+      settings: quiz.settings as unknown as QuizSettings,
+      questions: [],
+      testId: quiz.test_id,
+      isActive: quiz.is_active
     }));
   };
   
@@ -44,6 +46,6 @@ export function useQuizzes() {
     queryKey: ['quizzes', user?.id],
     queryFn: fetchQuizzes,
     enabled: !!user,
-    retry: 1, // Limit retries to avoid excessive API calls on error
+    retry: 1,
   });
 }

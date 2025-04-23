@@ -1,4 +1,3 @@
-
 // User and authentication types
 export type UserRole = 'professor' | 'student';
 
@@ -34,11 +33,13 @@ export interface Quiz {
   id: string;
   title: string;
   description: string;
-  createdBy: string; // Professor ID
+  createdBy: string;
   createdAt: string;
   settings: QuizSettings;
   questions: QuizQuestion[];
-  testId: string; // Unique code for students to join
+  testId: string;
+  isActive?: boolean;
+  updatedAt?: string;
 }
 
 // Student quiz attempt
