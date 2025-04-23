@@ -5,21 +5,21 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuizzes } from '@/hooks/useQuizzes';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export function ProfessorDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data: quizzes, isLoading, isError } = useQuizzes();
-  const { toast } = useToast();
+  const { data: quizzes, isLoading, isError, error } = useQuizzes();
 
-  if (isError) {
-    toast({
-      title: "Error",
-      description: "Failed to load quizzes. Please try again later.",
-      variant: "destructive",
-    });
-  }
+  // Use useEffect to show toast on error instead of doing it directly in render
+  React.useEffect(() => {
+    if (isError && error) {
+      toast.error("Failed to load quizzes", {
+        description: "Please try again later.",
+      });
+    }
+  }, [isError, error]);
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -38,6 +38,14 @@ export function ProfessorDashboard() {
             <div className="flex justify-center p-6">
               <p className="text-muted-foreground">Loading quizzes...</p>
             </div>
+          ) : isError ? (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground">
+                  Unable to load quizzes. Please try again later.
+                </p>
+              </CardContent>
+            </Card>
           ) : quizzes?.length === 0 ? (
             <Card>
               <CardContent className="pt-6">

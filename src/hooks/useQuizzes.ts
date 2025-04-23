@@ -44,5 +44,6 @@ export function useQuizzes() {
     queryKey: ['quizzes', user?.id],
     queryFn: fetchQuizzes,
     enabled: !!user,
+    retry: 1, // Limit retries to avoid excessive API calls on error
   });
 }
