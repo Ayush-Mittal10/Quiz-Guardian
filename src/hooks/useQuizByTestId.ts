@@ -27,6 +27,9 @@ export function useQuizByTestId(testId: string | undefined) {
 
       if (questionsError) throw questionsError;
 
+      // Cast the settings object to ensure TypeScript recognizes its structure
+      const quizSettings = quiz.settings as Record<string, any>;
+
       // Transform the data to match our Quiz type
       const formattedQuiz: Quiz = {
         id: quiz.id,
@@ -35,11 +38,11 @@ export function useQuizByTestId(testId: string | undefined) {
         createdBy: quiz.created_by,
         createdAt: quiz.created_at,
         settings: {
-          timeLimit: quiz.settings.timeLimit || 30,
-          shuffleQuestions: quiz.settings.shuffleQuestions || false,
-          showResults: quiz.settings.showResults || true,
-          monitoringEnabled: quiz.settings.monitoringEnabled || false,
-          allowedWarnings: quiz.settings.allowedWarnings || 3
+          timeLimit: typeof quizSettings.timeLimit === 'number' ? quizSettings.timeLimit : 30,
+          shuffleQuestions: typeof quizSettings.shuffleQuestions === 'boolean' ? quizSettings.shuffleQuestions : false,
+          showResults: typeof quizSettings.showResults === 'boolean' ? quizSettings.showResults : true,
+          monitoringEnabled: typeof quizSettings.monitoringEnabled === 'boolean' ? quizSettings.monitoringEnabled : false,
+          allowedWarnings: typeof quizSettings.allowedWarnings === 'number' ? quizSettings.allowedWarnings : 3
         } as QuizSettings,
         testId: quiz.test_id,
         isActive: quiz.is_active || false,
