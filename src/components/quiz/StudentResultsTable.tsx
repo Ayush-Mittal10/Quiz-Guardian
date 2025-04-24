@@ -1,4 +1,3 @@
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { QuizAttempt } from '@/types';
 
@@ -19,6 +18,14 @@ export const StudentResultsTable = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const sortedAttempts = [...attempts].sort((a, b) => {
+    if (!a.submittedAt && !b.submittedAt) return 0;
+    if (!a.submittedAt) return 1;
+    if (!b.submittedAt) return -1;
+    
+    return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+  });
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -33,7 +40,7 @@ export const StudentResultsTable = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {attempts.map((result) => (
+          {sortedAttempts.map((result) => (
             <TableRow
               key={result.id}
               className={selectedStudent === result.studentId ? 'bg-blue-50' : ''}

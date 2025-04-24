@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -80,8 +81,17 @@ const JoinQuiz = () => {
           variant: "default",
         });
       }
+      
+      // Show toast if quiz is not active
+      if (!quiz.isActive) {
+        toast({
+          title: "Quiz Not Active",
+          description: "This quiz is currently not active. Please contact your professor.",
+          variant: "destructive",
+        });
+      }
     }
-  }, [quiz]);
+  }, [quiz, toast]);
 
   if (quizLoading) {
     return (
@@ -96,6 +106,44 @@ const JoinQuiz = () => {
       <div className="min-h-screen bg-gray-50">
         <QuizHeader title="Academic Quiz Guardian" />
         <QuizErrorDisplay error={quizError ? quizError.message : "Quiz not found"} />
+      </div>
+    );
+  }
+  
+  // If quiz is not active, show a message that it's not available
+  if (!quiz.isActive) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <QuizHeader title="Academic Quiz Guardian" />
+        <main className="container mx-auto px-4 py-6">
+          <div className="max-w-2xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quiz Not Active</CardTitle>
+                <CardDescription>This quiz is currently not available</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-6 text-center">
+                  <div className="mb-4 text-red-500 text-6xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18"></path>
+                      <path d="m6 6 12 12"></path>
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2">Quiz Not Active</h2>
+                  <p className="text-gray-500 mb-4">
+                    This quiz is currently not available for taking. Please contact your professor for more information.
+                  </p>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full" variant="outline" onClick={() => navigate('/dashboard')}>
+                  Back to Dashboard
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </main>
       </div>
     );
   }

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -26,6 +25,18 @@ const TakeQuiz = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Check if quiz is active, if not redirect to join page
+  useEffect(() => {
+    if (quiz && !quiz.isActive) {
+      toast({
+        title: "Quiz Not Active",
+        description: "This quiz is not currently active. Please contact your professor.",
+        variant: "destructive",
+      });
+      navigate(`/join-quiz/${testId}`);
+    }
+  }, [quiz, testId, navigate, toast]);
   
   // Set the timer when quiz loads
   useEffect(() => {
@@ -236,6 +247,18 @@ const TakeQuiz = () => {
         <div className="max-w-md text-center">
           <h1 className="text-xl font-bold mb-4">Error Loading Quiz</h1>
           <p className="text-muted-foreground mb-6">{error instanceof Error ? error.message : "Quiz not found"}</p>
+          <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!quiz.isActive) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md text-center">
+          <h1 className="text-xl font-bold mb-4">Quiz Not Active</h1>
+          <p className="text-muted-foreground mb-6">This quiz is not currently active. Please contact your professor.</p>
           <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
         </div>
       </div>
