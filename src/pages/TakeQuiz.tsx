@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,7 @@ const TakeQuiz = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { quiz, isLoading, error } = useQuizByTestId(testId);
+  const { data: quiz, isLoading, error } = useQuizByTestId(testId);
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
@@ -234,14 +233,13 @@ const TakeQuiz = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md text-center">
           <h1 className="text-xl font-bold mb-4">Error Loading Quiz</h1>
-          <p className="text-muted-foreground mb-6">{error || "Quiz not found"}</p>
+          <p className="text-muted-foreground mb-6">{error instanceof Error ? error.message : "Quiz not found"}</p>
           <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
         </div>
       </div>
     );
   }
   
-  // No questions available
   if (quiz.questions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

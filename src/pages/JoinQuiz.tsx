@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,7 @@ const JoinQuiz = () => {
     microphone: false,
   });
   
-  const { quiz, isLoading: quizLoading, error: quizError } = useQuizByTestId(testId);
+  const { data: quiz, isLoading: quizLoading, error: quizError } = useQuizByTestId(testId);
 
   const requestPermissions = async () => {
     setIsLoading(true);
@@ -80,7 +79,7 @@ const JoinQuiz = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <QuizHeader title="Academic Quiz Guardian" />
-        <QuizErrorDisplay error={quizError || ""} />
+        <QuizErrorDisplay error={quizError ? quizError.message : "Quiz not found"} />
       </div>
     );
   }

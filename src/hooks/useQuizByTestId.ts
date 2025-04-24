@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, QuizQuestion } from '@/types';
+import { Quiz, QuizQuestion, QuizSettings } from '@/types';
 
 export function useQuizByTestId(testId: string | undefined) {
   return useQuery({
@@ -28,17 +28,33 @@ export function useQuizByTestId(testId: string | undefined) {
       if (questionsError) throw questionsError;
 
       // Transform the data to match our Quiz type
-      return {
+      const formattedQuiz: Quiz = {
         id: quiz.id,
         title: quiz.title,
-        description: quiz.description,
+        description: quiz.description || '',
         createdBy: quiz.created_by,
         createdAt: quiz.created_at,
-        settings: quiz.settings,
+        settings: {
+          timeLimit: quiz.settings.timeLimit || 30,
+          shuffleQuestions: quiz.settings.shuffleQuestions || false,
+          showResults: quiz.settings.showResults || true,
+          monitoringEnabled: quiz.settings.monitoringEnabled || false,
+          allowedWarnings: quiz.settings.allowedWarnings || 3
+        } as QuizSettings,
         testId: quiz.test_id,
-        isActive: quiz.is_active,
-        questions: questions as QuizQuestion[]
-      } as Quiz;
+        isActive: quiz.is_active || false,
+        // Map the questions to match our QuizQuestion type
+        questions: questions.map(q => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          options: Array.isArray(q.options) ? q.options : [],
+          correctAnswers: q.correct_answers,
+          points: q.points
+        })) as QuizQuestion[]
+      };
+
+      return formattedQuiz;
     },
     enabled: !!testId,
   });
