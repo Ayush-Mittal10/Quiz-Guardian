@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -78,7 +77,7 @@ const JoinQuiz = () => {
         toast({
           title: "Warning",
           description: "This quiz doesn't have any questions yet.",
-          variant: "warning",
+          variant: "default",
         });
       }
     }
