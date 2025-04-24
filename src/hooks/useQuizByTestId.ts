@@ -19,6 +19,8 @@ export function useQuizByTestId(testId: string | undefined) {
       if (quizError) throw quizError;
       if (!quiz) throw new Error('Quiz not found');
 
+      console.log('Found quiz:', quiz);
+
       // Then, get the questions for this quiz
       const { data: questions, error: questionsError } = await supabase
         .from('questions')
@@ -26,6 +28,8 @@ export function useQuizByTestId(testId: string | undefined) {
         .eq('quiz_id', quiz.id);
 
       if (questionsError) throw questionsError;
+      
+      console.log('Found questions:', questions);
 
       // Cast the settings object to ensure TypeScript recognizes its structure
       const quizSettings = quiz.settings as Record<string, any>;
@@ -57,6 +61,7 @@ export function useQuizByTestId(testId: string | undefined) {
         })) as QuizQuestion[]
       };
 
+      console.log('Formatted quiz:', formattedQuiz);
       return formattedQuiz;
     },
     enabled: !!testId,

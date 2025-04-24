@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ const TakeQuiz = () => {
   useEffect(() => {
     if (quiz) {
       setTimeLeft(quiz.settings.timeLimit * 60); // in seconds
+      console.log("Quiz loaded with questions:", quiz.questions.length);
     }
   }, [quiz]);
   
@@ -240,7 +242,7 @@ const TakeQuiz = () => {
     );
   }
   
-  if (quiz.questions.length === 0) {
+  if (!quiz.questions || quiz.questions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md text-center">

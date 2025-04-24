@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, QuizQuestion, QuizSettings, Warning } from '@/types';
 
@@ -35,6 +36,8 @@ export async function saveQuiz(
       };
     }
 
+    console.log('Quiz created successfully:', quizData);
+
     // Insert all questions
     if (questions.length > 0) {
       const questionsToInsert = questions.map(question => ({
@@ -46,9 +49,12 @@ export async function saveQuiz(
         points: question.points
       }));
       
-      const { error: questionsError } = await supabase
+      console.log('Inserting questions:', questionsToInsert);
+      
+      const { data: insertedQuestions, error: questionsError } = await supabase
         .from('questions')
-        .insert(questionsToInsert);
+        .insert(questionsToInsert)
+        .select();
       
       if (questionsError) {
         console.error('Error inserting questions:', questionsError);
@@ -59,6 +65,8 @@ export async function saveQuiz(
           error: questionsError
         };
       }
+      
+      console.log('Questions inserted successfully:', insertedQuestions);
     }
 
     return {
