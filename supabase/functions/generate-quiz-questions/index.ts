@@ -90,7 +90,7 @@ Important guidelines:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4o-mini", // Using a more cost-effective model
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Generate ${numQuestions} quiz questions about ${topic} at ${difficulty || "moderate"} difficulty.` },
@@ -100,6 +100,9 @@ Important guidelines:
       }),
     });
 
+    // Log response status and headers for debugging
+    console.log(`OpenAI API response status: ${response.status}`);
+    
     const data = await response.json();
     
     // Log the raw response for debugging
@@ -108,10 +111,19 @@ Important guidelines:
     // Check for API errors
     if (data.error) {
       console.error("OpenAI API error:", data.error);
+      
+      // Extract more specific error information
+      const errorMessage = data.error.message || "Unknown OpenAI API error";
+      const errorCode = data.error.code || "unknown";
+      const errorType = data.error.type || "unknown";
+      
+      console.error(`Error details - Code: ${errorCode}, Type: ${errorType}, Message: ${errorMessage}`);
+      
       return new Response(
         JSON.stringify({ 
-          error: `OpenAI API error: ${data.error.message || data.error}`,
-          code: data.error.code || "unknown"
+          error: `OpenAI API error: ${errorMessage}`,
+          code: errorCode,
+          type: errorType
         }),
         {
           status: 500,
@@ -165,7 +177,10 @@ Important guidelines:
   } catch (error) {
     console.error("Error generating quiz questions:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to generate questions" }),
+      JSON.stringify({ 
+        error: error.message || "Failed to generate questions",
+        stack: error.stack
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

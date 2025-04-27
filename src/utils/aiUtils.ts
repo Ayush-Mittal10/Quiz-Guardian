@@ -36,9 +36,16 @@ export async function generateQuestionsWithAI({
 
     if (data.error) {
       console.error('Error from edge function:', data.error);
+      
+      // Handle specific error types
       if (data.code === 'insufficient_quota') {
-        throw new Error('OpenAI API quota exceeded. Please check your billing details.');
+        throw new Error('OpenAI API quota exceeded. Please check your billing details or update your API key.');
       }
+      
+      if (data.type === 'insufficient_quota') {
+        throw new Error('OpenAI API quota exceeded. Please check your billing details or update your API key.');
+      }
+      
       throw new Error(data.error);
     }
 

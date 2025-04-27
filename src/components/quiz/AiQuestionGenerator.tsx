@@ -22,6 +22,7 @@ export const AiQuestionGenerator = ({ onQuestionsGenerated }: AiQuestionGenerato
   const [numQuestionsToGenerate, setNumQuestionsToGenerate] = useState<number>(3);
   const [difficulty, setDifficulty] = useState<'easy' | 'moderate' | 'hard' | 'expert'>('moderate');
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState<number>(0);
 
   const handleGenerate = async () => {
     if (!aiPrompt || numQuestionsToGenerate < 1) {
@@ -46,10 +47,18 @@ export const AiQuestionGenerator = ({ onQuestionsGenerated }: AiQuestionGenerato
       console.error('Error generating questions:', error);
       
       // Display specific error message
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate questions. Please try again.';
-      setError(errorMessage);
+      let errorMessage = error instanceof Error ? error.message : 'Failed to generate questions. Please try again.';
       
+      // Add more context for quota errors
+      if (errorMessage.toLowerCase().includes('quota') || errorMessage.toLowerCase().includes('billing')) {
+        errorMessage = 'OpenAI API quota exceeded or billing issue. The API key may need to be updated or your account may need additional credits.';
+      }
+      
+      setError(errorMessage);
       toast.error('Failed to generate questions');
+      
+      // Increment retry count for debugging purposes
+      setRetryCount(prevCount => prevCount + 1);
     } finally {
       setIsGenerating(false);
     }
@@ -69,6 +78,15 @@ export const AiQuestionGenerator = ({ onQuestionsGenerated }: AiQuestionGenerato
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {retryCount > 0 && (
+            <Alert className="bg-blue-50">
+              <AlertDescription>
+                If you're seeing OpenAI API errors, it might be due to the API key configuration. 
+                Please check that your OpenAI API key is valid and has sufficient quota.
+              </AlertDescription>
             </Alert>
           )}
           
