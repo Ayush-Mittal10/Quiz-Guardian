@@ -33,7 +33,7 @@ export const StudentDetailsPanel = ({ attempt, onClose }: StudentDetailsPanelPro
           id: q.id,
           text: q.text,
           type: q.type as QuestionType, // Cast to QuestionType
-          options: Array.isArray(q.options) ? q.options : [],
+          options: Array.isArray(q.options) ? q.options.map(opt => String(opt)) : [], // Convert each option to string
           correctAnswers: q.correct_answers,
           points: q.points
         }));
