@@ -1,7 +1,16 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { QuizQuestion } from "../../../src/types/index.ts";
+
+// Define QuizQuestion type internally instead of importing from src/types
+interface QuizQuestion {
+  id: string;
+  text: string;
+  type: "multiple-choice" | "single-choice";
+  options: string[];
+  correctAnswers: number[];
+  points: number;
+}
 
 const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
 
