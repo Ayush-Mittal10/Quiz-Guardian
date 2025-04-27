@@ -80,6 +80,19 @@ export const useQuizResults = (quizId: string | undefined) => {
           return;
         }
         
+        // Use auth.users to get emails along with profiles data
+        const { data: userEmailsData, error: userEmailsError } = await supabase.auth
+          .admin.listUsers({
+            perPage: 1000 // Adjust based on your expected user count
+          });
+        
+        let emailsMap = new Map();
+        if (!userEmailsError && userEmailsData) {
+          userEmailsData.users.forEach(user => {
+            emailsMap.set(user.id, user.email);
+          });
+        }
+        
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select(`
@@ -97,7 +110,8 @@ export const useQuizResults = (quizId: string | undefined) => {
           profilesMap.set(profile.id, {
             id: profile.id,
             name: profile.name,
-            email: '' // We won't have emails available through regular queries
+            // Get email from emailsMap or use empty string
+            email: emailsMap.get(profile.id) || ''
           });
         });
         
