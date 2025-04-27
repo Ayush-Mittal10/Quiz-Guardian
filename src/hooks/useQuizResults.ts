@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, Warning, QuizAttempt, QuizSettings } from '@/types';
+import { User } from '@supabase/supabase-js';
 
 export const useQuizResults = (quizId: string | undefined) => {
   const [loading, setLoading] = useState(true);
@@ -80,16 +81,26 @@ export const useQuizResults = (quizId: string | undefined) => {
           return;
         }
         
-        // Use auth.users to get emails along with profiles data
+        // Use auth.users to get emails
+        // Note: This requires admin privileges and may not work in all environments
+        type UserData = {
+          users: Array<{
+            id: string;
+            email?: string;
+          }>;
+        };
+        
         const { data: userEmailsData, error: userEmailsError } = await supabase.auth
           .admin.listUsers({
             perPage: 1000 // Adjust based on your expected user count
-          });
+          }) as { data: UserData | null, error: Error | null };
         
-        let emailsMap = new Map();
-        if (!userEmailsError && userEmailsData) {
+        let emailsMap = new Map<string, string>();
+        if (!userEmailsError && userEmailsData?.users) {
           userEmailsData.users.forEach(user => {
-            emailsMap.set(user.id, user.email);
+            if (user.id && user.email) {
+              emailsMap.set(user.id, user.email);
+            }
           });
         }
         
