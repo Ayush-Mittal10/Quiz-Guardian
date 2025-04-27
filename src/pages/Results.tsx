@@ -6,7 +6,7 @@ import { useQuizResults } from '@/hooks/useQuizResults';
 import { QuizStatsCards } from '@/components/quiz/QuizStatsCards';
 import { StudentResultsTable } from '@/components/quiz/StudentResultsTable';
 import { StudentDetailsPanel } from '@/components/quiz/StudentDetailsPanel';
-import { FileExcel } from 'lucide-react';
+import { File } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const Results = () => {
@@ -87,7 +87,7 @@ const Results = () => {
           <h1 className="text-xl font-bold text-primary">Academic Quiz Guardian</h1>
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleExportResults}>
-              <FileExcel className="mr-2" />
+              <File className="mr-2" />
               Export Results
             </Button>
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
