@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import { MonitoringWarning } from '@/components/quiz/MonitoringWarning';
 import { PermissionsStatus } from '@/components/quiz/PermissionsStatus';
 import { QuizErrorDisplay } from '@/components/quiz/QuizErrorDisplay';
 import { useToast } from '@/components/ui/use-toast';
+import { useStudentAttempts } from '@/hooks/useStudentAttempts';
 
 const JoinQuiz = () => {
   const { testId } = useParams<{ testId: string }>();
@@ -24,18 +24,19 @@ const JoinQuiz = () => {
   });
   
   const { data: quiz, isLoading: quizLoading, error: quizError } = useQuizByTestId(testId);
+  const { attempts } = useStudentAttempts();
+
+  const hasAttempted = quiz && attempts.some(attempt => attempt.quizId === quiz.id);
 
   const requestPermissions = async () => {
     setIsLoading(true);
     try {
-      // Request camera permission if monitoring is enabled
       if (quiz?.settings.monitoringEnabled) {
         const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        cameraStream.getTracks().forEach(track => track.stop()); // Stop the stream after getting permission
+        cameraStream.getTracks().forEach(track => track.stop());
         
-        // Request microphone permission
         const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStream.getTracks().forEach(track => track.stop()); // Stop the stream
+        micStream.getTracks().forEach(track => track.stop());
       }
       
       setPermissions({
@@ -44,7 +45,6 @@ const JoinQuiz = () => {
       });
     } catch (error) {
       console.error('Error requesting permissions:', error);
-      // Continue anyway, but warn the user
       setPermissions({
         camera: false,
         microphone: false,
@@ -61,7 +61,6 @@ const JoinQuiz = () => {
   };
   
   useEffect(() => {
-    // If monitoring is disabled in quiz settings, auto-accept permissions
     if (quiz && !quiz.settings.monitoringEnabled) {
       setPermissions({
         camera: true,
@@ -69,7 +68,6 @@ const JoinQuiz = () => {
       });
     }
     
-    // Log quiz data for debugging
     if (quiz) {
       console.log("Quiz joined:", quiz);
       console.log("Quiz questions:", quiz.questions);
@@ -82,7 +80,6 @@ const JoinQuiz = () => {
         });
       }
       
-      // Show toast if quiz is not active
       if (!quiz.isActive) {
         toast({
           title: "Quiz Not Active",
@@ -109,8 +106,45 @@ const JoinQuiz = () => {
       </div>
     );
   }
+
+  if (hasAttempted) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <QuizHeader title="Academic Quiz Guardian" />
+        <main className="container mx-auto px-4 py-6">
+          <div className="max-w-2xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quiz Already Attempted</CardTitle>
+                <CardDescription>You have already taken this quiz</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-6 text-center">
+                  <div className="mb-4 text-amber-500 text-6xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/>
+                      <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2">Multiple Attempts Not Allowed</h2>
+                  <p className="text-gray-500 mb-4">
+                    You have already attempted this quiz. Only one attempt is allowed per student.
+                  </p>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full" variant="outline" onClick={() => navigate('/dashboard')}>
+                  Back to Dashboard
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
   
-  // If quiz is not active, show a message that it's not available
   if (!quiz.isActive) {
     return (
       <div className="min-h-screen bg-gray-50">
