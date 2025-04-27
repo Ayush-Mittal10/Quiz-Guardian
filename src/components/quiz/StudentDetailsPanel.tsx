@@ -1,11 +1,11 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { QuizAttempt, QuizQuestion } from '@/types';
+import { QuizAttempt, QuizQuestion, QuestionType } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 
 interface StudentDetailsPanelProps {
@@ -19,7 +19,7 @@ export const StudentDetailsPanel = ({ attempt, onClose }: StudentDetailsPanelPro
   const [loading, setLoading] = useState(true);
 
   // Fetch questions for this quiz
-  useState(() => {
+  useEffect(() => {
     const fetchQuizQuestions = async () => {
       try {
         const { data, error } = await supabase
@@ -32,7 +32,7 @@ export const StudentDetailsPanel = ({ attempt, onClose }: StudentDetailsPanelPro
         const formattedQuestions: QuizQuestion[] = data.map(q => ({
           id: q.id,
           text: q.text,
-          type: q.type,
+          type: q.type as QuestionType, // Cast to QuestionType
           options: Array.isArray(q.options) ? q.options : [],
           correctAnswers: q.correct_answers,
           points: q.points
