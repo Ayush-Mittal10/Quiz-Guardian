@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { generateQuestionsWithAI } from '@/utils/aiUtils';
 import { QuizQuestion } from '@/types';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface AiQuestionGeneratorProps {
   onQuestionsGenerated: (questions: QuizQuestion[]) => void;
@@ -20,6 +21,7 @@ export const AiQuestionGenerator = ({ onQuestionsGenerated }: AiQuestionGenerato
   const [isGenerating, setIsGenerating] = useState(false);
   const [numQuestionsToGenerate, setNumQuestionsToGenerate] = useState<number>(3);
   const [difficulty, setDifficulty] = useState<'easy' | 'moderate' | 'hard' | 'expert'>('moderate');
+  const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!aiPrompt || numQuestionsToGenerate < 1) {
@@ -28,6 +30,7 @@ export const AiQuestionGenerator = ({ onQuestionsGenerated }: AiQuestionGenerato
     }
 
     setIsGenerating(true);
+    setError(null);
 
     try {
       const generatedQuestions = await generateQuestionsWithAI({
@@ -41,7 +44,12 @@ export const AiQuestionGenerator = ({ onQuestionsGenerated }: AiQuestionGenerato
       toast.success(`Generated ${generatedQuestions.length} questions successfully`);
     } catch (error) {
       console.error('Error generating questions:', error);
-      toast.error('Failed to generate questions. Please try again.');
+      
+      // Display specific error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate questions. Please try again.';
+      setError(errorMessage);
+      
+      toast.error('Failed to generate questions');
     } finally {
       setIsGenerating(false);
     }
@@ -57,6 +65,13 @@ export const AiQuestionGenerator = ({ onQuestionsGenerated }: AiQuestionGenerato
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Number of Questions</Label>

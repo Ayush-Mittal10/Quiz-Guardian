@@ -26,6 +26,18 @@ serve(async (req) => {
   }
 
   try {
+    // Check if OpenAI API key is configured
+    if (!openaiApiKey) {
+      console.error("OpenAI API key is not configured");
+      return new Response(
+        JSON.stringify({ error: "OpenAI API key is not configured" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { topic, numQuestions, difficulty } = await req.json();
 
     if (!topic || !numQuestions) {
@@ -37,6 +49,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log(`Generating ${numQuestions} questions about "${topic}" at ${difficulty || "moderate"} difficulty`);
 
     // Construct system prompt for consistent question generation
     const systemPrompt = `You are an educational quiz question generator. Generate ${numQuestions} multiple-choice quiz questions about "${topic}" at ${difficulty || "moderate"} difficulty level.
@@ -67,6 +81,8 @@ Important guidelines:
 - No duplicate questions or answer options
 - Each question must have exactly one correct answer`;
 
+    console.log("Sending request to OpenAI API...");
+    
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -86,6 +102,24 @@ Important guidelines:
 
     const data = await response.json();
     
+    // Log the raw response for debugging
+    console.log("OpenAI API response received:", JSON.stringify(data).slice(0, 200) + "...");
+    
+    // Check for API errors
+    if (data.error) {
+      console.error("OpenAI API error:", data.error);
+      return new Response(
+        JSON.stringify({ 
+          error: `OpenAI API error: ${data.error.message || data.error}`,
+          code: data.error.code || "unknown"
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       console.error("Unexpected API response:", data);
       throw new Error("Invalid response from OpenAI API");
@@ -94,10 +128,20 @@ Important guidelines:
     let generatedQuestions;
     try {
       const content = data.choices[0].message.content;
+      console.log("Content received:", content.slice(0, 200) + "...");
+      
       // Extract JSON part if the AI included extra text
       const jsonMatch = content.match(/\[\s*\{.*\}\s*\]/s);
       const jsonContent = jsonMatch ? jsonMatch[0] : content;
-      generatedQuestions = JSON.parse(jsonContent);
+      
+      try {
+        generatedQuestions = JSON.parse(jsonContent);
+        console.log(`Successfully parsed ${generatedQuestions.length} questions`);
+      } catch (parseError) {
+        console.error("JSON parsing error:", parseError);
+        console.log("JSON content that failed to parse:", jsonContent);
+        throw new Error("Failed to parse generated questions: " + parseError.message);
+      }
       
       // Validate and format questions
       generatedQuestions = generatedQuestions.map((q: any, index: number) => ({
@@ -109,10 +153,12 @@ Important guidelines:
         points: typeof q.points === "number" && q.points >= 1 && q.points <= 5 ? q.points : 1
       }));
     } catch (error) {
-      console.error("Error parsing generated questions:", error);
-      throw new Error("Failed to parse generated questions");
+      console.error("Error processing generated questions:", error);
+      throw new Error("Failed to process generated questions: " + error.message);
     }
 
+    console.log(`Successfully generated and formatted ${generatedQuestions.length} questions`);
+    
     return new Response(JSON.stringify({ questions: generatedQuestions }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -127,4 +173,3 @@ Important guidelines:
     );
   }
 });
-
