@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Warning } from '@/types';
+import { Warning, QuizSettings } from '@/types';
 
 export type MonitoringStudent = {
   id: string;
@@ -42,7 +42,12 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
       if (quizError) throw quizError;
       
       setQuizTitle(quizData.title);
-      setTimeLimit(quizData.settings?.timeLimit || 30);
+      
+      // Type check and safely extract timeLimit from settings
+      if (quizData.settings && typeof quizData.settings === 'object') {
+        const settings = quizData.settings as unknown as QuizSettings;
+        setTimeLimit(settings.timeLimit || 30);
+      }
       
       // Count questions
       const { count, error: countError } = await supabase
