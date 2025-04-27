@@ -16,6 +16,7 @@ import { QuizQuestion, QuestionType } from '@/types';
 import { saveQuiz } from '@/utils/quizUtils';
 import { useToast } from '@/hooks/use-toast';
 import { QuizPublishedModal } from '@/components/quiz/QuizPublishedModal';
+import { AiQuestionGenerator } from '@/components/quiz/AiQuestionGenerator';
 
 const quizSettingsSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -42,9 +43,6 @@ const CreateQuiz = () => {
     correctAnswers: [],
     points: 1
   });
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [numQuestionsToGenerate, setNumQuestionsToGenerate] = useState<number>(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [publishedQuizId, setPublishedQuizId] = useState('');
@@ -153,30 +151,8 @@ const CreateQuiz = () => {
     ));
   };
 
-  const generateQuestionsWithAI = async () => {
-    if (!aiPrompt || numQuestionsToGenerate < 1) return;
-    
-    setIsGenerating(true);
-    
-    setTimeout(() => {
-      const mockGeneratedQuestions: QuizQuestion[] = Array(numQuestionsToGenerate).fill(null).map((_, index) => ({
-        id: `q-${Date.now()}-${index}`,
-        text: `What is the main concept of ${aiPrompt}?`,
-        type: 'single-choice',
-        options: [
-          `The principle theory of ${aiPrompt}`,
-          `The practical application of ${aiPrompt}`,
-          `The historical development of ${aiPrompt}`,
-          `The future implications of ${aiPrompt}`
-        ],
-        correctAnswers: [0],
-        points: 2
-      }));
-      
-      setQuestions([...questions, ...mockGeneratedQuestions]);
-      setAiPrompt('');
-      setIsGenerating(false);
-    }, 2000);
+  const handleAIQuestionsGenerated = (generatedQuestions: QuizQuestion[]) => {
+    setQuestions([...questions, ...generatedQuestions]);
   };
 
   const publishQuiz = async (data: QuizSettingsFormValues) => {
@@ -506,44 +482,7 @@ const CreateQuiz = () => {
                 </TabsContent>
                 
                 <TabsContent value="ai" className="space-y-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Generate Questions with AI</CardTitle>
-                      <CardDescription>
-                        Enter a topic or keywords to generate quiz questions
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Number of Questions</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={10}
-                              value={numQuestionsToGenerate}
-                              onChange={(e) => setNumQuestionsToGenerate(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-                            />
-                            <p className="text-sm text-muted-foreground">
-                              Generate between 1 and 10 questions
-                            </p>
-                          </div>
-                        </div>
-                        <Textarea
-                          placeholder="e.g., Photosynthesis, Chemical reactions, World War II"
-                          value={aiPrompt}
-                          onChange={(e) => setAiPrompt(e.target.value)}
-                        />
-                        <Button 
-                          onClick={generateQuestionsWithAI} 
-                          disabled={!aiPrompt || isGenerating}
-                        >
-                          {isGenerating ? 'Generating...' : 'Generate Questions'}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <AiQuestionGenerator onQuestionsGenerated={handleAIQuestionsGenerated} />
                 </TabsContent>
               </Tabs>
               
