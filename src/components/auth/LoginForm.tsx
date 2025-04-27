@@ -22,7 +22,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -46,7 +46,11 @@ export function LoginForm() {
         title: "Login successful",
         description: "You have been logged in.",
       });
-      navigate('/dashboard');
+      
+      // Add a small delay before navigation to ensure the auth state is updated
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 100);
     } catch (error: any) {
       setError(error.message || 'Login failed. Please try again.');
       toast({
@@ -58,6 +62,13 @@ export function LoginForm() {
       setIsLoading(false);
     }
   };
+
+  // If already authenticated, redirect to dashboard
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   return (
     <Card className="w-full max-w-md">
