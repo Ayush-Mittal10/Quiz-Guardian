@@ -1,4 +1,6 @@
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { QuizAttempt } from '@/types';
 
 interface StudentResultsTableProps {
@@ -37,6 +39,7 @@ export const StudentResultsTable = ({
             <TableHead>Submitted</TableHead>
             <TableHead>Warnings</TableHead>
             <TableHead>Integrity</TableHead>
+            <TableHead>Details</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -44,7 +47,6 @@ export const StudentResultsTable = ({
             <TableRow
               key={result.id}
               className={selectedStudent === result.studentId ? 'bg-blue-50' : ''}
-              onClick={() => onSelectStudent(result.studentId)}
             >
               <TableCell>
                 <div>{result.student?.name || 'Unknown Student'}</div>
@@ -87,12 +89,21 @@ export const StudentResultsTable = ({
                   </span>
                 )}
               </TableCell>
+              <TableCell>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => onSelectStudent(result.studentId)}
+                >
+                  View
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
 
           {attempts.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                 No quiz attempts found
               </TableCell>
             </TableRow>

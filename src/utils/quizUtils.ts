@@ -91,9 +91,29 @@ export async function saveQuizAttempt(
   answers: Record<string, number[]>,
   warnings: Warning[] = [],
   autoSubmitted: boolean = false
-): Promise<{ success: boolean; id: string; error?: any }> {
+): Promise<{ success: boolean; id: string; error?: any; message?: string }> {
   try {
-    // First, calculate the score by comparing answers with correct answers
+    // First, check if the student has already attempted this quiz
+    const { data: existingAttempts, error: checkError } = await supabase
+      .from('quiz_attempts')
+      .select('id')
+      .eq('quiz_id', quizId)
+      .eq('student_id', studentId);
+    
+    if (checkError) {
+      throw checkError;
+    }
+    
+    // If the student has already attempted this quiz, prevent another attempt
+    if (existingAttempts && existingAttempts.length > 0) {
+      return {
+        success: false,
+        id: '',
+        message: 'You have already attempted this quiz. Only one attempt is allowed per student.'
+      };
+    }
+    
+    // Calculate the score by comparing answers with correct answers
     const { data: questions, error: questionsError } = await supabase
       .from('questions')
       .select('id, correct_answers, points')

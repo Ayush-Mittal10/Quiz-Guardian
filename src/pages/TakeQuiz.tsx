@@ -26,7 +26,6 @@ const TakeQuiz = () => {
   const [submitting, setSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   
-  // Check if quiz is active, if not redirect to join page
   useEffect(() => {
     if (quiz && !quiz.isActive) {
       toast({
@@ -38,15 +37,13 @@ const TakeQuiz = () => {
     }
   }, [quiz, testId, navigate, toast]);
   
-  // Set the timer when quiz loads
   useEffect(() => {
     if (quiz) {
-      setTimeLeft(quiz.settings.timeLimit * 60); // in seconds
+      setTimeLeft(quiz.settings.timeLimit * 60);
       console.log("Quiz loaded with questions:", quiz.questions.length);
     }
   }, [quiz]);
   
-  // Start camera feed
   useEffect(() => {
     let stream: MediaStream | null = null;
     
@@ -75,7 +72,6 @@ const TakeQuiz = () => {
     };
   }, [quiz]);
   
-  // Timer countdown
   useEffect(() => {
     if (!quiz || timeLeft <= 0) return;
     
@@ -93,7 +89,6 @@ const TakeQuiz = () => {
     return () => clearInterval(timer);
   }, [quiz, timeLeft]);
   
-  // Monitor tab/window focus
   useEffect(() => {
     if (!quiz?.settings.monitoringEnabled) return;
     
@@ -134,12 +129,10 @@ const TakeQuiz = () => {
     setWarnings(prev => {
       const updatedWarnings = [...prev, newWarning];
       
-      // Show alert
       setAlertMessage(`Warning: ${description}`);
       setIsAlertVisible(true);
       setTimeout(() => setIsAlertVisible(false), 3000);
       
-      // Auto-submit if too many warnings
       if (updatedWarnings.length >= quiz.settings.allowedWarnings) {
         submitQuiz(true);
       }
@@ -215,11 +208,23 @@ const TakeQuiz = () => {
           }
         });
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to submit quiz. Please try again.",
-          variant: "destructive",
-        });
+        if (result.message) {
+          toast({
+            title: "Multiple Attempts Not Allowed",
+            description: result.message,
+            variant: "destructive",
+          });
+          
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 3000);
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to submit quiz. Please try again.",
+            variant: "destructive",
+          });
+        }
         setSubmitting(false);
       }
     } catch (error) {
@@ -281,7 +286,6 @@ const TakeQuiz = () => {
   
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      {/* Warning alert */}
       {isAlertVisible && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           <strong className="font-bold">Warning!</strong>
@@ -305,7 +309,6 @@ const TakeQuiz = () => {
 
       <main className="container mx-auto px-4 py-6">
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Main content - Question */}
           <div className="md:col-span-3">
             <Card>
               <CardContent className="p-6">
@@ -382,7 +385,6 @@ const TakeQuiz = () => {
             </Card>
           </div>
           
-          {/* Sidebar - Camera feed */}
           <div className="md:col-span-1">
             <Card>
               <CardContent className="p-4">

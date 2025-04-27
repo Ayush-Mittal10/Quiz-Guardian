@@ -22,6 +22,10 @@ const Results = () => {
     );
   }
 
+  const selectedAttempt = selectedStudent 
+    ? attempts.find(a => a.studentId === selectedStudent) 
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -52,9 +56,9 @@ const Results = () => {
             </CardContent>
           </Card>
 
-          {selectedStudent && (
+          {selectedAttempt && (
             <StudentDetailsPanel
-              attempt={attempts.find(a => a.studentId === selectedStudent)!}
+              attempt={selectedAttempt}
               onClose={() => setSelectedStudent(null)}
             />
           )}
