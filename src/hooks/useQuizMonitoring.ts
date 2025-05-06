@@ -84,7 +84,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
       setTotalQuestions(count || 0);
       console.log('Total questions count:', count);
       
-      // Fetch ongoing attempts
+      // Fetch ongoing attempts - Specifically get attempts where submitted_at is null
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('quiz_attempts')
         .select(`
@@ -96,7 +96,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
           warnings
         `)
         .eq('quiz_id', quizId)
-        .is('submitted_at', null); // Only fetch ongoing attempts
+        .is('submitted_at', null); // This ensures we only get ongoing attempts
       
       if (attemptsError) {
         console.error('Error fetching attempts:', attemptsError);

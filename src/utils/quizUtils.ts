@@ -142,7 +142,111 @@ export async function saveQuiz(
   }
 }
 
+export async function createInitialAttempt(
+  quizId: string,
+  studentId: string
+): Promise<{ success: boolean; id?: string; attemptId?: string; answers?: Record<string, number[]>; message?: string; error?: any }> {
+  try {
+    console.log(`Creating initial attempt for student ${studentId} on quiz ${quizId}`);
+    
+    // First, check if the student has already attempted this quiz
+    const { data: existingAttempts, error: checkError } = await supabase
+      .from('quiz_attempts')
+      .select('id, answers, submitted_at')
+      .eq('quiz_id', quizId)
+      .eq('student_id', studentId);
+    
+    if (checkError) {
+      console.error('Error checking for existing attempts:', checkError);
+      throw checkError;
+    }
+    
+    // If a submitted attempt exists, prevent another attempt
+    if (existingAttempts && existingAttempts.length > 0) {
+      const submittedAttempt = existingAttempts.find(attempt => attempt.submitted_at !== null);
+      
+      if (submittedAttempt) {
+        console.log('Student has already submitted this quiz');
+        return {
+          success: false,
+          message: 'You have already submitted this quiz. Only one attempt is allowed per student.'
+        };
+      }
+      
+      // If there's an ongoing attempt that hasn't been submitted yet, return its ID
+      const ongoingAttempt = existingAttempts.find(attempt => attempt.submitted_at === null);
+      if (ongoingAttempt) {
+        console.log('Ongoing attempt found, returning ID:', ongoingAttempt.id);
+        return {
+          success: true,
+          attemptId: ongoingAttempt.id,
+          answers: ongoingAttempt.answers as Record<string, number[]> || {}
+        };
+      }
+    }
+    
+    // If no existing attempt, create a new one
+    const { data: attemptData, error: attemptError } = await supabase
+      .from('quiz_attempts')
+      .insert({
+        quiz_id: quizId,
+        student_id: studentId,
+        answers: {},
+        warnings: [],
+        // Note: submitted_at is null to indicate this is an ongoing attempt
+      })
+      .select()
+      .single();
+    
+    if (attemptError) {
+      console.error('Error creating attempt:', attemptError);
+      throw attemptError;
+    }
+    
+    console.log('Successfully created initial attempt:', attemptData.id);
+    
+    return {
+      success: true,
+      id: attemptData.id
+    };
+  } catch (error: any) {
+    console.error('Error creating initial attempt:', error);
+    return {
+      success: false,
+      error,
+      message: error.message || 'An error occurred while creating the attempt'
+    };
+  }
+}
+
+export async function updateQuizAttemptAnswers(
+  attemptId: string,
+  answers: Record<string, number[]>
+): Promise<boolean> {
+  try {
+    console.log(`Updating answers for attempt ${attemptId}`);
+    
+    const { error } = await supabase
+      .from('quiz_attempts')
+      .update({
+        answers: answers
+      })
+      .eq('id', attemptId);
+    
+    if (error) {
+      console.error('Error updating attempt answers:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating attempt answers:', error);
+    return false;
+  }
+}
+
 export async function saveQuizAttempt(
+  attemptId: string,
   quizId: string,
   studentId: string,
   answers: Record<string, number[]>,
@@ -150,25 +254,7 @@ export async function saveQuizAttempt(
   autoSubmitted: boolean = false
 ): Promise<{ success: boolean; id: string; error?: any; message?: string }> {
   try {
-    // First, check if the student has already attempted this quiz
-    const { data: existingAttempts, error: checkError } = await supabase
-      .from('quiz_attempts')
-      .select('id')
-      .eq('quiz_id', quizId)
-      .eq('student_id', studentId);
-    
-    if (checkError) {
-      throw checkError;
-    }
-    
-    // If the student has already attempted this quiz, prevent another attempt
-    if (existingAttempts && existingAttempts.length > 0) {
-      return {
-        success: false,
-        id: '',
-        message: 'You have already attempted this quiz. Only one attempt is allowed per student.'
-      };
-    }
+    console.log(`Submitting quiz attempt ${attemptId} for student ${studentId}`);
     
     // Calculate the score by comparing answers with correct answers
     const { data: questions, error: questionsError } = await supabase
@@ -209,18 +295,17 @@ export async function saveQuizAttempt(
       description: warning.description
     }));
     
-    // Insert the attempt
+    // Update the attempt with submission data
     const { data: attemptData, error: attemptError } = await supabase
       .from('quiz_attempts')
-      .insert({
-        quiz_id: quizId,
-        student_id: studentId,
+      .update({
         answers: answers,
         warnings: jsonWarnings,
         auto_submitted: autoSubmitted,
         score: scorePercentage,
         submitted_at: new Date().toISOString()
       })
+      .eq('id', attemptId)
       .select()
       .single();
     
@@ -237,7 +322,8 @@ export async function saveQuizAttempt(
     return {
       success: false,
       id: '',
-      error
+      error,
+      message: error.message || 'An error occurred while submitting the quiz'
     };
   }
 }

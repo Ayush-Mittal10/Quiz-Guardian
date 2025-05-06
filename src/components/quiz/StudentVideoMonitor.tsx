@@ -13,6 +13,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   const [videoFeed, setVideoFeed] = useState<string | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isConnectionError, setIsConnectionError] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   
   // For demo purposes, we'll simulate getting a stream from the remote student
@@ -24,6 +25,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
     
     const simulateVideoFeed = async () => {
       setIsLoading(true);
+      setIsConnectionError(false);
       
       try {
         // In a real implementation, we would use WebRTC or similar technology to get the student's camera feed
@@ -44,10 +46,12 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
           setVideoFeed('active');
         } else {
           console.error('Media devices not available');
+          setIsConnectionError(true);
           setVideoFeed('/placeholder.svg'); // Fallback to placeholder
         }
       } catch (err) {
         console.error('Error accessing media devices:', err);
+        setIsConnectionError(true);
         setVideoFeed('/placeholder.svg'); // Fallback to placeholder
       } finally {
         setIsLoading(false);
@@ -84,6 +88,12 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
     setIsAudioEnabled(prev => !prev);
   };
   
+  const retryConnection = () => {
+    if (studentId) {
+      setVideoFeed(null); // Reset state to trigger reconnection
+    }
+  };
+  
   return (
     <div className="space-y-4">
       <h3 className="font-medium mb-2">Video Feed</h3>
@@ -111,11 +121,21 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
             </div>
           </>
         ) : videoFeed ? (
-          <img 
-            src={videoFeed} 
-            alt="Student video feed" 
-            className="w-full h-full object-cover"
-          />
+          <div className="h-full flex flex-col items-center justify-center">
+            <img 
+              src={videoFeed} 
+              alt="Student video feed" 
+              className="w-full h-full object-cover"
+            />
+            {isConnectionError && (
+              <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
+                <p className="text-white mb-2">Connection error</p>
+                <Button variant="outline" size="sm" onClick={retryConnection}>
+                  Retry connection
+                </Button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full text-white">
             {isLoading ? 'Loading video...' : 'Select a student to view video'}
@@ -129,6 +149,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
             id="audio-toggle" 
             checked={isAudioEnabled}
             onCheckedChange={toggleAudio}
+            disabled={videoFeed !== 'active'}
           />
           <label htmlFor="audio-toggle" className="text-sm cursor-pointer">
             {isAudioEnabled ? 'Audio enabled' : 'Audio disabled'}

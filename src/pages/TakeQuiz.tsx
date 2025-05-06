@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,8 +8,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { Quiz, QuizQuestion, Warning } from '@/types';
 import { useQuizByTestId } from '@/hooks/useQuizByTestId';
-import { saveQuizAttempt } from '@/utils/quizUtils';
+import { saveQuizAttempt, createInitialAttempt, updateQuizAttemptAnswers } from '@/utils/quizUtils';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const TakeQuiz = () => {
   const { testId } = useParams<{ testId: string }>();
@@ -25,6 +27,7 @@ const TakeQuiz = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
   
   useEffect(() => {
     if (quiz && !quiz.isActive) {
@@ -38,11 +41,59 @@ const TakeQuiz = () => {
   }, [quiz, testId, navigate, toast]);
   
   useEffect(() => {
-    if (quiz) {
+    if (quiz && user) {
       setTimeLeft(quiz.settings.timeLimit * 60);
       console.log("Quiz loaded with questions:", quiz.questions.length);
+      
+      // Create initial attempt when quiz is loaded
+      const initializeAttempt = async () => {
+        try {
+          const result = await createInitialAttempt(quiz.id, user.id);
+          if (result.success && result.id) {
+            console.log("Initial attempt created with ID:", result.id);
+            setAttemptId(result.id);
+          } else if (result.attemptId) {
+            // If there's an existing attempt, use that ID
+            console.log("Existing attempt found:", result.attemptId);
+            setAttemptId(result.attemptId);
+            
+            // If there are existing answers, load them
+            if (result.answers) {
+              console.log("Loading existing answers");
+              setAnswers(result.answers);
+            }
+          } else {
+            console.error("Failed to create initial attempt:", result.error || result.message);
+            toast({
+              title: "Error",
+              description: result.message || "Failed to initialize quiz attempt",
+              variant: "destructive",
+            });
+          }
+        } catch (err) {
+          console.error("Error initializing attempt:", err);
+        }
+      };
+      
+      initializeAttempt();
     }
-  }, [quiz]);
+  }, [quiz, user]);
+  
+  // Update answers in the database periodically
+  useEffect(() => {
+    if (!attemptId || Object.keys(answers).length === 0) return;
+    
+    const updateInterval = setInterval(async () => {
+      console.log("Updating answers in database...");
+      try {
+        await updateQuizAttemptAnswers(attemptId, answers);
+      } catch (error) {
+        console.error("Error updating answers:", error);
+      }
+    }, 30000); // Update every 30 seconds
+    
+    return () => clearInterval(updateInterval);
+  }, [attemptId, answers]);
   
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -118,7 +169,7 @@ const TakeQuiz = () => {
   };
   
   const addWarning = (type: 'tab-switch' | 'focus-loss' | 'multiple-faces' | 'no-face', description: string) => {
-    if (!quiz) return;
+    if (!quiz || !attemptId) return;
     
     const newWarning: Warning = {
       timestamp: new Date().toISOString(),
@@ -132,6 +183,21 @@ const TakeQuiz = () => {
       setAlertMessage(`Warning: ${description}`);
       setIsAlertVisible(true);
       setTimeout(() => setIsAlertVisible(false), 3000);
+      
+      // Update warnings in the database
+      if (attemptId) {
+        try {
+          supabase
+            .from('quiz_attempts')
+            .update({ warnings: updatedWarnings })
+            .eq('id', attemptId)
+            .then(({ error }) => {
+              if (error) console.error("Error updating warnings:", error);
+            });
+        } catch (error) {
+          console.error("Error updating warnings:", error);
+        }
+      }
       
       if (updatedWarnings.length >= quiz.settings.allowedWarnings) {
         submitQuiz(true);
@@ -148,28 +214,30 @@ const TakeQuiz = () => {
     
     if (!question) return;
     
+    let updatedAnswers;
+    
     if (question.type === 'single-choice') {
-      setAnswers(prev => ({
-        ...prev,
+      updatedAnswers = {
+        ...answers,
         [questionId]: [optionIndex],
-      }));
+      };
     } else {
-      setAnswers(prev => {
-        const currentAnswers = prev[questionId] || [];
-        
-        if (checked) {
-          return {
-            ...prev,
-            [questionId]: [...currentAnswers, optionIndex],
-          };
-        } else {
-          return {
-            ...prev,
-            [questionId]: currentAnswers.filter(index => index !== optionIndex),
-          };
-        }
-      });
+      const currentAnswers = answers[questionId] || [];
+      
+      if (checked) {
+        updatedAnswers = {
+          ...answers,
+          [questionId]: [...currentAnswers, optionIndex],
+        };
+      } else {
+        updatedAnswers = {
+          ...answers,
+          [questionId]: currentAnswers.filter(index => index !== optionIndex),
+        };
+      }
     }
+    
+    setAnswers(updatedAnswers);
   };
   
   const goToNextQuestion = () => {
@@ -185,12 +253,13 @@ const TakeQuiz = () => {
   };
   
   const submitQuiz = async (autoSubmitted: boolean = false) => {
-    if (!quiz || !user || submitting) return;
+    if (!quiz || !user || submitting || !attemptId) return;
     
     setSubmitting(true);
     
     try {
       const result = await saveQuizAttempt(
+        attemptId,
         quiz.id,
         user.id,
         answers,
@@ -208,23 +277,11 @@ const TakeQuiz = () => {
           }
         });
       } else {
-        if (result.message) {
-          toast({
-            title: "Multiple Attempts Not Allowed",
-            description: result.message,
-            variant: "destructive",
-          });
-          
-          setTimeout(() => {
-            navigate('/dashboard');
-          }, 3000);
-        } else {
-          toast({
-            title: "Error",
-            description: "Failed to submit quiz. Please try again.",
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: "Error",
+          description: result.message || "Failed to submit quiz. Please try again.",
+          variant: "destructive",
+        });
         setSubmitting(false);
       }
     } catch (error) {
