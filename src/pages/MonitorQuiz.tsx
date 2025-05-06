@@ -8,7 +8,18 @@ import { useQuizMonitoring } from '@/hooks/useQuizMonitoring';
 import { StudentVideoMonitor } from '@/components/quiz/StudentVideoMonitor';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "@/components/ui/alert-dialog";
 
 const MonitorQuiz = () => {
   const { quizId } = useParams<{ quizId: string }>();
@@ -28,6 +39,19 @@ const MonitorQuiz = () => {
     refreshData
   } = useQuizMonitoring(quizId);
 
+  // Handle periodic refresh
+  useEffect(() => {
+    // Initial load
+    refreshData();
+    
+    // Set up periodic refresh
+    const intervalId = setInterval(() => {
+      refreshData();
+    }, 10000); // Refresh every 10 seconds
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -35,16 +59,11 @@ const MonitorQuiz = () => {
   };
 
   const handleStudentClick = (studentId: string) => {
-    setSelectedStudent(studentId);
+    setSelectedStudent(prevId => prevId === studentId ? null : studentId);
   };
 
-  const endQuiz = async () => {
-    const confirmation = window.confirm(
-      "Are you sure you want to end this quiz for all students? This will submit the quiz for everyone immediately."
-    );
-    
-    if (!confirmation) return;
-    
+  const handleEndQuiz = async () => {
+    console.log("Ending quiz for all students");
     const success = await endQuizForAll();
     if (success) {
       toast({
@@ -55,23 +74,25 @@ const MonitorQuiz = () => {
       // Wait a moment before navigating to results
       setTimeout(() => {
         navigate(`/results/${quizId}`);
-      }, 1000);
+      }, 1500);
     }
   };
   
   const handleEndForStudent = async (studentId: string, attemptId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent row selection
-    
-    const confirmation = window.confirm(
-      "Are you sure you want to end this quiz for this student? This will submit their quiz immediately."
-    );
-    
-    if (!confirmation) return;
-    
+    console.log(`Ending quiz for student ${studentId}`);
     await endQuizForStudent(studentId, attemptId);
     if (selectedStudent === studentId) {
       setSelectedStudent(null);
     }
+  };
+
+  const handleRefresh = () => {
+    refreshData();
+    toast({
+      title: "Refreshed",
+      description: "Monitoring data has been updated."
+    });
   };
 
   return (
@@ -94,9 +115,38 @@ const MonitorQuiz = () => {
                 Total Questions: {totalQuestions} | Time Limit: {timeLimit} minutes
               </p>
             </div>
-            <Button variant="destructive" onClick={endQuiz}>
-              End Quiz
-            </Button>
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={handleRefresh}>
+                Refresh Data
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">End Quiz</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center">
+                      <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
+                      End Quiz for All Students
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will immediately submit the quiz for all students currently taking it 
+                      and deactivate the quiz so no new students can join.
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleEndQuiz}
+                      className="bg-red-500 hover:bg-red-600"
+                    >
+                      End Quiz
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
 
           {loading ? (
@@ -157,13 +207,35 @@ const MonitorQuiz = () => {
                                 )}
                               </TableCell>
                               <TableCell>
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm"
-                                  onClick={(e) => handleEndForStudent(student.id, student.attemptId, e)}
-                                >
-                                  End for Student
-                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      variant="destructive" 
+                                      size="sm"
+                                      onClick={(e) => e.stopPropagation()} // Prevent row selection
+                                    >
+                                      End for Student
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>End Quiz for {student.name}</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will immediately submit the quiz for this student.
+                                        This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        onClick={(e) => handleEndForStudent(student.id, student.attemptId, e as any)}
+                                        className="bg-red-500 hover:bg-red-600"
+                                      >
+                                        End Quiz
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -217,19 +289,40 @@ const MonitorQuiz = () => {
                           >
                             Close
                           </Button>
-                          <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            className="flex-1"
-                            onClick={(e) => {
-                              const studentData = students.find(s => s.id === selectedStudent);
-                              if (studentData) {
-                                handleEndForStudent(studentData.id, studentData.attemptId, e as any);
-                              }
-                            }}
-                          >
-                            End for Student
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="destructive" 
+                                size="sm" 
+                                className="flex-1"
+                              >
+                                End for Student
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>End Quiz for Student</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will immediately submit the quiz for this student.
+                                  This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={(e) => {
+                                    const studentData = students.find(s => s.id === selectedStudent);
+                                    if (studentData) {
+                                      handleEndForStudent(studentData.id, studentData.attemptId, e as any);
+                                    }
+                                  }}
+                                  className="bg-red-500 hover:bg-red-600"
+                                >
+                                  End Quiz
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     ) : (

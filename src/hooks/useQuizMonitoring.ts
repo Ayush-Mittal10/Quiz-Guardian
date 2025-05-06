@@ -35,12 +35,32 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
       // Fetch quiz details
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
-        .select('title, settings')
+        .select('title, settings, is_active')
         .eq('id', quizId)
         .single();
       
-      if (quizError) throw quizError;
+      if (quizError) {
+        console.error('Error fetching quiz:', quizError);
+        toast({
+          variant: 'destructive',
+          title: 'Failed to fetch quiz details',
+          description: quizError.message
+        });
+        throw quizError;
+      }
       
+      if (!quizData) {
+        console.error('Quiz not found');
+        toast({
+          variant: 'destructive',
+          title: 'Quiz not found',
+          description: 'The requested quiz could not be found'
+        });
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Fetched quiz data:', quizData);
       setQuizTitle(quizData.title);
       
       // Type check and safely extract timeLimit from settings
@@ -55,9 +75,13 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         .select('*', { count: 'exact', head: true })
         .eq('quiz_id', quizId);
       
-      if (countError) throw countError;
+      if (countError) {
+        console.error('Error counting questions:', countError);
+        throw countError;
+      }
       
       setTotalQuestions(count || 0);
+      console.log('Total questions count:', count);
       
       // Fetch ongoing attempts
       const { data: attemptsData, error: attemptsError } = await supabase
@@ -73,65 +97,50 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         .eq('quiz_id', quizId)
         .is('submitted_at', null); // Only fetch ongoing attempts
       
-      if (attemptsError) throw attemptsError;
+      if (attemptsError) {
+        console.error('Error fetching attempts:', attemptsError);
+        throw attemptsError;
+      }
+      
+      console.log('Fetched ongoing attempts:', attemptsData?.length || 0);
       
       // Get student profile information
-      const studentIds = attemptsData.map(attempt => attempt.student_id);
+      const studentIds = attemptsData?.map(attempt => attempt.student_id) || [];
       
       if (studentIds.length === 0) {
+        console.log('No active students found');
         setStudents([]);
         setLoading(false);
         return;
       }
+      
+      console.log('Fetching profiles for student IDs:', studentIds);
       
       const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
         .select('id, name')
         .in('id', studentIds);
       
-      if (studentsError) throw studentsError;
+      if (studentsError) {
+        console.error('Error fetching student profiles:', studentsError);
+        throw studentsError;
+      }
+      
+      console.log('Fetched student profiles:', studentsData?.length || 0);
       
       // Map profiles to a lookup object
-      const profileLookup = studentsData.reduce((acc, profile) => {
+      const profileLookup = (studentsData || []).reduce((acc, profile) => {
         acc[profile.id] = profile;
         return acc;
       }, {} as Record<string, { id: string; name: string }>);
       
       // Get student emails from auth
-      // Note: This may not work with limited permissions
-      type UserData = {
-        users: Array<{
-          id: string;
-          email?: string;
-        }>;
-      };
-      
-      let emailLookup: Record<string, string> = {};
-      
-      try {
-        // Try to get emails, but this may fail with limited permissions
-        const { data: usersData, error: usersError } = await supabase.auth
-          .admin.listUsers({
-            perPage: 1000
-          }) as { data: UserData | null, error: Error | null };
-          
-        if (!usersError && usersData?.users) {
-          emailLookup = usersData.users.reduce((acc, user) => {
-            if (user.id && user.email) {
-              acc[user.id] = user.email;
-            }
-            return acc;
-          }, {} as Record<string, string>);
-        }
-      } catch (emailError) {
-        console.error('Failed to fetch emails:', emailError);
-        // Continue without emails
-      }
+      // Note: This may not work with limited permissions - removed this part
+      // since it's not critical and may cause permission issues
       
       // Format student data
-      const formattedStudents: MonitoringStudent[] = attemptsData.map(attempt => {
-        const profile = profileLookup[attempt.student_id] || { name: 'Unknown Student' };
-        const email = emailLookup[attempt.student_id] || '';
+      const formattedStudents: MonitoringStudent[] = attemptsData?.map(attempt => {
+        const profile = profileLookup[attempt.student_id] || { id: attempt.student_id, name: 'Unknown Student' };
         
         // Calculate time elapsed
         const startTime = new Date(attempt.started_at).getTime();
@@ -153,15 +162,16 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         return {
           id: attempt.student_id,
           name: profile.name,
-          email,
+          email: '', // Email removed due to potential permission issues
           progress,
           timeElapsed,
           warnings,
           attemptId: attempt.id,
           answers: answers
         };
-      });
+      }) || [];
       
+      console.log('Formatted students data:', formattedStudents.length);
       setStudents(formattedStudents);
     } catch (error: any) {
       console.error('Error fetching monitoring data:', error);
@@ -178,6 +188,8 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
   // Function to end quiz for a specific student
   const endQuizForStudent = async (studentId: string, attemptId: string) => {
     try {
+      console.log(`Ending quiz for student ${studentId}, attempt ${attemptId}`);
+      
       // Update the quiz attempt to mark it as submitted
       const { error } = await supabase
         .from('quiz_attempts')
@@ -187,7 +199,10 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         })
         .eq('id', attemptId);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating quiz attempt:', error);
+        throw error;
+      }
       
       toast({
         title: 'Quiz ended for student',
@@ -214,9 +229,9 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
     if (!quizId || students.length === 0) return false;
     
     try {
-      // Update all ongoing attempts for this quiz
-      const attemptIds = students.map(student => student.attemptId);
+      console.log(`Ending quiz ${quizId} for all students`);
       
+      // Update all ongoing attempts for this quiz
       const { error } = await supabase
         .from('quiz_attempts')
         .update({
@@ -226,17 +241,29 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         .eq('quiz_id', quizId)
         .is('submitted_at', null);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating quiz attempts:', error);
+        throw error;
+      }
+      
+      console.log('Successfully ended all student attempts');
       
       // Also mark the quiz as inactive
-      await supabase
+      const { error: quizError } = await supabase
         .from('quizzes')
         .update({ is_active: false })
         .eq('id', quizId);
       
+      if (quizError) {
+        console.error('Error deactivating quiz:', quizError);
+        throw quizError;
+      }
+      
+      console.log('Successfully marked quiz as inactive');
+      
       toast({
         title: 'Quiz ended for all students',
-        description: 'All students\' quizzes have been submitted.'
+        description: 'All students\' quizzes have been submitted and the quiz has been deactivated.'
       });
       
       // Clear the students list
@@ -256,6 +283,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
   
   // Initial fetch and setup polling
   useEffect(() => {
+    console.log('Setting up monitor for quiz ID:', quizId);
     fetchStudentData();
     
     // Set up polling for real-time updates
