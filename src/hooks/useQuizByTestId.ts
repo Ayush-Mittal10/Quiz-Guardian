@@ -16,31 +16,47 @@ export function useQuizByTestId(testId: string | undefined) {
         .eq('test_id', testId)
         .single();
 
-      if (quizError) throw quizError;
-      if (!quiz) throw new Error('Quiz not found');
+      if (quizError) {
+        console.error('Error fetching quiz by test_id:', quizError);
+        throw quizError;
+      }
+      
+      if (!quiz) {
+        console.error('No quiz found for test_id:', testId);
+        throw new Error('Quiz not found');
+      }
 
       console.log('Found quiz:', quiz);
+      console.log('Quiz ID for question lookup:', quiz.id);
 
-      // Then, get the questions for this quiz
+      // Then, get the questions for this quiz using the quiz.id
       const { data: questions, error: questionsError } = await supabase
         .from('questions')
         .select('*')
         .eq('quiz_id', quiz.id);
 
-      if (questionsError) throw questionsError;
+      if (questionsError) {
+        console.error('Error fetching questions for quiz_id:', quiz.id, questionsError);
+        throw questionsError;
+      }
       
-      console.log('Found questions:', questions?.length || 0);
+      console.log('Found questions count:', questions?.length || 0);
       
-      // Add this debugging to check the structure of returned questions
-      if (questions) {
+      // Add detailed debugging for questions
+      if (questions && questions.length > 0) {
+        console.log('Questions found for quiz_id:', quiz.id);
         questions.forEach((q, index) => {
           console.log(`Question ${index + 1}:`, {
             id: q.id,
+            quiz_id: q.quiz_id,
             text: q.text,
+            type: q.type,
             correctAnswers: q.correct_answers,
             options: Array.isArray(q.options) ? q.options : []
           });
         });
+      } else {
+        console.log('No questions found for quiz_id:', quiz.id);
       }
 
       // Cast the settings object to ensure TypeScript recognizes its structure
@@ -74,7 +90,7 @@ export function useQuizByTestId(testId: string | undefined) {
       };
 
       console.log('Formatted quiz:', formattedQuiz);
-      console.log('Question count:', formattedQuiz.questions.length);
+      console.log('Question count after formatting:', formattedQuiz.questions.length);
       return formattedQuiz;
     },
     enabled: !!testId,

@@ -37,6 +37,7 @@ export async function saveQuiz(
     }
 
     console.log('Quiz created successfully:', quizData);
+    console.log('Quiz ID for questions:', quizData.id);
 
     // Insert all questions
     if (questions.length > 0) {
@@ -49,7 +50,8 @@ export async function saveQuiz(
         points: question.points
       }));
       
-      console.log('Inserting questions:', questionsToInsert);
+      console.log('Inserting questions for quiz_id:', quizData.id);
+      console.log('Questions to insert:', questionsToInsert);
       
       const { data: insertedQuestions, error: questionsError } = await supabase
         .from('questions')
@@ -66,7 +68,16 @@ export async function saveQuiz(
         };
       }
       
-      console.log('Questions inserted successfully:', insertedQuestions);
+      console.log('Questions inserted successfully. Count:', insertedQuestions?.length || 0);
+      if (insertedQuestions) {
+        insertedQuestions.forEach((q, index) => {
+          console.log(`Inserted Question ${index + 1}:`, {
+            id: q.id,
+            quiz_id: q.quiz_id,
+            text: q.text
+          });
+        });
+      }
     }
 
     return {
