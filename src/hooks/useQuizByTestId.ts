@@ -29,7 +29,19 @@ export function useQuizByTestId(testId: string | undefined) {
 
       if (questionsError) throw questionsError;
       
-      console.log('Found questions:', questions);
+      console.log('Found questions:', questions?.length || 0);
+      
+      // Add this debugging to check the structure of returned questions
+      if (questions) {
+        questions.forEach((q, index) => {
+          console.log(`Question ${index + 1}:`, {
+            id: q.id,
+            text: q.text,
+            correctAnswers: q.correct_answers,
+            options: Array.isArray(q.options) ? q.options : []
+          });
+        });
+      }
 
       // Cast the settings object to ensure TypeScript recognizes its structure
       const quizSettings = quiz.settings as Record<string, any>;
@@ -50,18 +62,19 @@ export function useQuizByTestId(testId: string | undefined) {
         } as QuizSettings,
         testId: quiz.test_id,
         isActive: quiz.is_active || false,
-        // Map the questions to match our QuizQuestion type
-        questions: questions.map(q => ({
+        // Map the questions to match our QuizQuestion type and ensure it's never undefined
+        questions: Array.isArray(questions) ? questions.map(q => ({
           id: q.id,
           text: q.text,
           type: q.type,
           options: Array.isArray(q.options) ? q.options : [],
-          correctAnswers: q.correct_answers,
-          points: q.points
-        })) as QuizQuestion[]
+          correctAnswers: Array.isArray(q.correct_answers) ? q.correct_answers : [],
+          points: typeof q.points === 'number' ? q.points : 1
+        })) as QuizQuestion[] : []
       };
 
       console.log('Formatted quiz:', formattedQuiz);
+      console.log('Question count:', formattedQuiz.questions.length);
       return formattedQuiz;
     },
     enabled: !!testId,

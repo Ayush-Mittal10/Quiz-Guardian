@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,7 @@ const JoinQuiz = () => {
     if (quiz) {
       console.log("Quiz joined:", quiz);
       console.log("Quiz questions:", quiz.questions);
+      console.log("Questions count:", quiz.questions?.length);
       
       if (!quiz.questions || quiz.questions.length === 0) {
         toast({
@@ -208,6 +210,12 @@ const JoinQuiz = () => {
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-700">
                       <p className="font-medium">Warning: This quiz has no questions.</p>
                       <p className="text-sm">The professor may still be setting up this quiz.</p>
+                    </div>
+                  )}
+
+                  {(quiz.questions && quiz.questions.length > 0) && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700">
+                      <p className="font-medium">Quiz ready: {quiz.questions.length} question(s) available.</p>
                     </div>
                   )}
                   
