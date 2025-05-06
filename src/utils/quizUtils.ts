@@ -41,8 +41,15 @@ export async function saveQuiz(
 
     // Insert all questions
     if (questions.length > 0) {
+      // IMPORTANT: Make sure we're using the correct quiz_id from the newly created quiz
+      const newQuizId = quizData.id;
+      
+      // Log the quiz ID to ensure it's correct
+      console.log('Using quiz ID for all questions:', newQuizId);
+      
+      // Create a proper array of questions to insert, ensuring each has the correct quiz_id
       const questionsToInsert = questions.map(question => ({
-        quiz_id: quizData.id,
+        quiz_id: newQuizId, // Explicitly use the new quiz ID
         text: question.text,
         type: question.type,
         options: question.options,
@@ -50,8 +57,15 @@ export async function saveQuiz(
         points: question.points
       }));
       
-      console.log('Inserting questions for quiz_id:', quizData.id);
-      console.log('Questions to insert:', questionsToInsert);
+      console.log('Inserting questions for quiz_id:', newQuizId);
+      console.log('Questions count to insert:', questionsToInsert.length);
+      questionsToInsert.forEach((q, i) => {
+        console.log(`Question ${i+1} to insert:`, {
+          quiz_id: q.quiz_id,
+          text: q.text.substring(0, 30) + '...',
+          type: q.type
+        });
+      });
       
       const { data: insertedQuestions, error: questionsError } = await supabase
         .from('questions')
@@ -74,7 +88,8 @@ export async function saveQuiz(
           console.log(`Inserted Question ${index + 1}:`, {
             id: q.id,
             quiz_id: q.quiz_id,
-            text: q.text
+            text: q.text.substring(0, 30) + '...',
+            type: q.type
           });
         });
       }
