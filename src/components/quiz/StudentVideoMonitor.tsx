@@ -16,7 +16,6 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   const videoRef = useRef<HTMLVideoElement>(null);
   
   // For demo purposes, we'll simulate getting a stream from the remote student
-  // In a real app, this would use WebRTC or a similar technology to access the remote student's camera/mic
   useEffect(() => {
     if (!studentId) {
       setVideoFeed(null);
@@ -27,7 +26,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
       setIsLoading(true);
       
       try {
-        // In a real app, you'd fetch the student's stream from your streaming service
+        // In a real implementation, we would use WebRTC or similar technology to get the student's camera feed
         // Here we'll use the local camera for demonstration purposes
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const constraints = {

@@ -31,6 +31,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
     
     try {
       setLoading(true);
+      console.log('Fetching monitoring data for quiz:', quizId);
       
       // Fetch quiz details
       const { data: quizData, error: quizError } = await supabase
@@ -102,7 +103,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         throw attemptsError;
       }
       
-      console.log('Fetched ongoing attempts:', attemptsData?.length || 0);
+      console.log('Fetched ongoing attempts:', attemptsData?.length || 0, attemptsData);
       
       // Get student profile information
       const studentIds = attemptsData?.map(attempt => attempt.student_id) || [];
@@ -133,10 +134,6 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         acc[profile.id] = profile;
         return acc;
       }, {} as Record<string, { id: string; name: string }>);
-      
-      // Get student emails from auth
-      // Note: This may not work with limited permissions - removed this part
-      // since it's not critical and may cause permission issues
       
       // Format student data
       const formattedStudents: MonitoringStudent[] = attemptsData?.map(attempt => {
@@ -210,7 +207,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
       });
       
       // Update the local state by removing the student
-      setStudents(prev => prev.filter(student => student.id !== studentId));
+      setStudents(prev => prev.filter(student => student.attemptId !== attemptId));
       
       return true;
     } catch (error: any) {
@@ -280,18 +277,54 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
       return false;
     }
   };
-  
-  // Initial fetch and setup polling
+
+  // Set up real-time subscription for quiz attempts
   useEffect(() => {
-    console.log('Setting up monitor for quiz ID:', quizId);
+    if (!quizId) return;
+    
+    console.log('Setting up real-time subscription for quiz attempts');
+    
+    // Create a channel for quiz attempts
+    const channel = supabase
+      .channel('quiz-attempts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'quiz_attempts',
+          filter: `quiz_id=eq.${quizId}`,
+        },
+        (payload) => {
+          console.log('New quiz attempt detected:', payload);
+          fetchStudentData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'quiz_attempts',
+          filter: `quiz_id=eq.${quizId}`,
+        },
+        (payload) => {
+          console.log('Quiz attempt updated:', payload);
+          // If a student submitted, refresh the data
+          fetchStudentData();
+        }
+      )
+      .subscribe(status => {
+        console.log('Realtime subscription status:', status);
+      });
+    
+    // Initial fetch
     fetchStudentData();
     
-    // Set up polling for real-time updates
-    const interval = setInterval(() => {
-      fetchStudentData();
-    }, 5000); // Poll every 5 seconds
-    
-    return () => clearInterval(interval);
+    return () => {
+      console.log('Cleanup: removing real-time subscription');
+      supabase.removeChannel(channel);
+    };
   }, [quizId]);
   
   return {

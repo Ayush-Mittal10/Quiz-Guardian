@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { useQuizMonitoring } from '@/hooks/useQuizMonitoring';
 import { StudentVideoMonitor } from '@/components/quiz/StudentVideoMonitor';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCcw } from 'lucide-react';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -38,19 +38,6 @@ const MonitorQuiz = () => {
     endQuizForAll,
     refreshData
   } = useQuizMonitoring(quizId);
-
-  // Handle periodic refresh
-  useEffect(() => {
-    // Initial load
-    refreshData();
-    
-    // Set up periodic refresh
-    const intervalId = setInterval(() => {
-      refreshData();
-    }, 10000); // Refresh every 10 seconds
-    
-    return () => clearInterval(intervalId);
-  }, []);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -116,7 +103,12 @@ const MonitorQuiz = () => {
               </p>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" onClick={handleRefresh}>
+              <Button 
+                variant="outline" 
+                onClick={handleRefresh} 
+                className="flex items-center gap-2"
+              >
+                <RefreshCcw className="h-4 w-4" />
                 Refresh Data
               </Button>
               <AlertDialog>
@@ -159,8 +151,11 @@ const MonitorQuiz = () => {
               {/* Students List */}
               <div className="lg:col-span-2">
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Students ({students.length})</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {students.length === 0 ? 'No active students' : 'Real-time monitoring active'}
+                    </p>
                   </CardHeader>
                   <CardContent>
                     {students.length === 0 ? (
@@ -181,7 +176,7 @@ const MonitorQuiz = () => {
                         <TableBody>
                           {students.map((student) => (
                             <TableRow 
-                              key={student.id} 
+                              key={student.attemptId} 
                               className={`${selectedStudent === student.id ? 'bg-blue-50' : ''} cursor-pointer`}
                               onClick={() => handleStudentClick(student.id)}
                             >
@@ -193,7 +188,7 @@ const MonitorQuiz = () => {
                                 <div className="w-full bg-gray-200 rounded-full h-2.5">
                                   <div 
                                     className="bg-blue-600 h-2.5 rounded-full" 
-                                    style={{ width: `${(student.progress / totalQuestions) * 100}%` }}
+                                    style={{ width: `${totalQuestions > 0 ? (student.progress / totalQuestions) * 100 : 0}%` }}
                                   ></div>
                                 </div>
                                 <div className="text-xs mt-1">{student.progress}/{totalQuestions}</div>
