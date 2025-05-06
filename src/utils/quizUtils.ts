@@ -13,6 +13,9 @@ export async function saveQuiz(
     // Generate a unique test ID (uppercase letters and numbers)
     const testId = Math.random().toString(36).substring(2, 8).toUpperCase();
     
+    console.log('Creating new quiz with title:', title);
+    console.log('Question count before saving:', questions.length);
+    
     // Insert the quiz - explicitly cast settings to Json type expected by Supabase
     const { data: quizData, error: quizError } = await supabase
       .from('quizzes')
@@ -48,14 +51,27 @@ export async function saveQuiz(
       console.log('Using quiz ID for all questions:', newQuizId);
       
       // Create a proper array of questions to insert, ensuring each has the correct quiz_id
-      const questionsToInsert = questions.map(question => ({
-        quiz_id: newQuizId, // Explicitly use the new quiz ID
-        text: question.text,
-        type: question.type,
-        options: question.options,
-        correct_answers: question.correctAnswers,
-        points: question.points
-      }));
+      const questionsToInsert = questions.map(question => {
+        // Ensure each question has the correct quiz_id in the right format
+        const formattedQuestion = {
+          quiz_id: newQuizId, // Explicitly use the new quiz ID
+          text: question.text,
+          type: question.type,
+          options: question.options,
+          correct_answers: question.correctAnswers,
+          points: question.points
+        };
+        
+        // Double check that we're using the right quiz_id
+        if (formattedQuestion.quiz_id !== newQuizId) {
+          console.error('Quiz ID mismatch when formatting questions:', {
+            expected: newQuizId,
+            actual: formattedQuestion.quiz_id
+          });
+        }
+        
+        return formattedQuestion;
+      });
       
       console.log('Inserting questions for quiz_id:', newQuizId);
       console.log('Questions count to insert:', questionsToInsert.length);
@@ -67,6 +83,12 @@ export async function saveQuiz(
         });
       });
       
+      // Debug potential issues before inserting
+      if (questionsToInsert.some(q => !q.quiz_id || q.quiz_id !== newQuizId)) {
+        console.error('Warning: Some questions have incorrect quiz_id');
+      }
+      
+      // Insert questions
       const { data: insertedQuestions, error: questionsError } = await supabase
         .from('questions')
         .insert(questionsToInsert)
@@ -92,6 +114,16 @@ export async function saveQuiz(
             type: q.type
           });
         });
+      }
+      
+      // Verify that questions were inserted with the correct quiz_id
+      const { data: verifyQuestions, error: verifyError } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('quiz_id', newQuizId);
+        
+      if (!verifyError) {
+        console.log(`Verification: Found ${verifyQuestions?.length || 0} questions with quiz_id ${newQuizId}`);
       }
     }
 

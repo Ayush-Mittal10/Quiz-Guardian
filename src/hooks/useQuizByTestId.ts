@@ -9,6 +9,8 @@ export function useQuizByTestId(testId: string | undefined) {
     queryFn: async () => {
       if (!testId) throw new Error('Test ID is required');
 
+      console.log('Fetching quiz with test_id:', testId);
+      
       // First, get the quiz details
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
@@ -29,15 +31,34 @@ export function useQuizByTestId(testId: string | undefined) {
       console.log('Found quiz:', quiz);
       console.log('Quiz ID for question lookup:', quiz.id);
 
-      // Then, get the questions for this quiz using the quiz.id
+      // Check if the quiz ID is a valid UUID before proceeding
+      if (!quiz.id || typeof quiz.id !== 'string' || quiz.id.length < 36) {
+        console.error('Invalid quiz ID format:', quiz.id);
+        throw new Error('Invalid quiz ID format');
+      }
+
+      // Improved query to fetch questions - use textual comparison to avoid any type issues
       const { data: questions, error: questionsError } = await supabase
         .from('questions')
         .select('*')
-        .eq('quiz_id', quiz.id);
+        .eq('quiz_id', quiz.id.toString());
 
       if (questionsError) {
         console.error('Error fetching questions for quiz_id:', quiz.id, questionsError);
         throw questionsError;
+      }
+      
+      // Add debugging to verify what's in the database
+      // This will get all questions from the database to check if they exist
+      const { data: allQuestions, error: allQuestionsError } = await supabase
+        .from('questions')
+        .select('id, quiz_id')
+        .limit(100);
+        
+      if (!allQuestionsError && allQuestions) {
+        console.log('All questions in database (first 100):', allQuestions);
+        const matchingQuestions = allQuestions.filter(q => q.quiz_id === quiz.id);
+        console.log('Questions matching this quiz_id by filter:', matchingQuestions);
       }
       
       console.log('Found questions count:', questions?.length || 0);
