@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
-import { Quiz, QuizQuestion, Warning } from '@/types';
+import { Quiz, QuizQuestion, Warning, JsonWarning } from '@/types';
 import { useQuizByTestId } from '@/hooks/useQuizByTestId';
 import { saveQuizAttempt, createInitialAttempt, updateQuizAttemptAnswers } from '@/utils/quizUtils';
 import { useToast } from '@/components/ui/use-toast';
@@ -184,12 +183,19 @@ const TakeQuiz = () => {
       setIsAlertVisible(true);
       setTimeout(() => setIsAlertVisible(false), 3000);
       
+      // Convert warnings to JSON format for database storage
+      const jsonWarnings: JsonWarning[] = updatedWarnings.map(warning => ({
+        timestamp: warning.timestamp,
+        type: warning.type,
+        description: warning.description
+      }));
+      
       // Update warnings in the database
       if (attemptId) {
         try {
           supabase
             .from('quiz_attempts')
-            .update({ warnings: updatedWarnings })
+            .update({ warnings: jsonWarnings })
             .eq('id', attemptId)
             .then(({ error }) => {
               if (error) console.error("Error updating warnings:", error);

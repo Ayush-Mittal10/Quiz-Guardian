@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Quiz, QuizQuestion, QuizSettings, Warning } from '@/types';
+import { Quiz, QuizQuestion, QuizSettings, Warning, JsonWarning } from '@/types';
 
 export async function saveQuiz(
   title: string, 
@@ -289,7 +289,7 @@ export async function saveQuizAttempt(
     const scorePercentage = Math.round((totalScore / totalPossibleScore) * 100);
     
     // Convert warnings to JSON format suitable for database storage
-    const jsonWarnings = warnings.map(warning => ({
+    const jsonWarnings: JsonWarning[] = warnings.map(warning => ({
       type: warning.type,
       timestamp: warning.timestamp,
       description: warning.description
