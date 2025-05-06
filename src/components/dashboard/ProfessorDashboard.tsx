@@ -9,6 +9,8 @@ import { useQuizzes } from '@/hooks/useQuizzes';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Trash2 } from 'lucide-react';
 
 export function ProfessorDashboard() {
   const { user } = useAuth();
@@ -38,6 +40,38 @@ export function ProfessorDashboard() {
       queryClient.invalidateQueries({ queryKey: ['quizzes'] });
     } catch (err) {
       toast.error('Failed to update quiz status', {
+        description: 'Please try again later.',
+      });
+    }
+  };
+
+  const handleQuizDelete = async (quizId: string, quizTitle: string) => {
+    try {
+      // First, delete all questions associated with the quiz
+      const { error: questionsError } = await supabase
+        .from('questions')
+        .delete()
+        .eq('quiz_id', quizId);
+        
+      if (questionsError) {
+        throw questionsError;
+      }
+      
+      // Then delete the quiz itself
+      const { error: quizError } = await supabase
+        .from('quizzes')
+        .delete()
+        .eq('id', quizId);
+        
+      if (quizError) {
+        throw quizError;
+      }
+
+      toast.success(`Quiz "${quizTitle}" deleted successfully`);
+      queryClient.invalidateQueries({ queryKey: ['quizzes'] });
+    } catch (err) {
+      console.error('Error deleting quiz:', err);
+      toast.error('Failed to delete quiz', {
         description: 'Please try again later.',
       });
     }
@@ -105,15 +139,45 @@ export function ProfessorDashboard() {
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-between">
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/edit-quiz/${quiz.id}`)}>
-                      Edit
-                    </Button>
-                    <Button size="sm" onClick={() => navigate(`/monitor-quiz/${quiz.id}`)}>
-                      Monitor
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => navigate(`/results/${quiz.id}`)}>
-                      Results
-                    </Button>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/edit-quiz/${quiz.id}`)}>
+                        Edit
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600">
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure you want to delete this quiz?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the quiz "{quiz.title}" 
+                              and all associated questions and student attempts.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              className="bg-red-500 hover:bg-red-600"
+                              onClick={() => handleQuizDelete(quiz.id, quiz.title)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button size="sm" onClick={() => navigate(`/monitor-quiz/${quiz.id}`)}>
+                        Monitor
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => navigate(`/results/${quiz.id}`)}>
+                        Results
+                      </Button>
+                    </div>
                   </CardFooter>
                 </Card>
               ))}

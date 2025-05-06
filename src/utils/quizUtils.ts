@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, QuizQuestion, QuizSettings, Warning } from '@/types';
 
@@ -238,6 +237,64 @@ export async function saveQuizAttempt(
     return {
       success: false,
       id: '',
+      error
+    };
+  }
+}
+
+export async function deleteQuiz(
+  quizId: string
+): Promise<{ success: boolean; error?: any }> {
+  try {
+    console.log('Deleting quiz and related data for quiz ID:', quizId);
+    
+    // First, delete all questions associated with the quiz
+    const { error: questionsError } = await supabase
+      .from('questions')
+      .delete()
+      .eq('quiz_id', quizId);
+      
+    if (questionsError) {
+      console.error('Error deleting questions for quiz:', questionsError);
+      throw questionsError;
+    }
+    
+    console.log('Successfully deleted all questions for quiz ID:', quizId);
+    
+    // Delete any quiz attempts associated with this quiz
+    const { error: attemptsError } = await supabase
+      .from('quiz_attempts')
+      .delete()
+      .eq('quiz_id', quizId);
+    
+    if (attemptsError) {
+      console.error('Error deleting quiz attempts:', attemptsError);
+      // Continue with deletion even if attempts deletion fails
+      console.warn('Continuing with quiz deletion despite error with attempts deletion');
+    } else {
+      console.log('Successfully deleted all attempts for quiz ID:', quizId);
+    }
+    
+    // Then delete the quiz itself
+    const { error: quizError } = await supabase
+      .from('quizzes')
+      .delete()
+      .eq('id', quizId);
+      
+    if (quizError) {
+      console.error('Error deleting quiz:', quizError);
+      throw quizError;
+    }
+    
+    console.log('Successfully deleted quiz with ID:', quizId);
+
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('Error in deleteQuiz function:', error);
+    return {
+      success: false,
       error
     };
   }
