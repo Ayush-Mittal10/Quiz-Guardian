@@ -37,7 +37,7 @@ export function useQuizByTestId(testId: string | undefined) {
         throw new Error('Invalid quiz ID format');
       }
 
-      // Improved query to fetch questions - use textual comparison to avoid any type issues
+      // Try to fetch questions with the updated RLS policies
       const { data: questions, error: questionsError } = await supabase
         .from('questions')
         .select('*')
@@ -48,20 +48,7 @@ export function useQuizByTestId(testId: string | undefined) {
         throw questionsError;
       }
       
-      // Add debugging to verify what's in the database
-      // This will get all questions from the database to check if they exist
-      const { data: allQuestions, error: allQuestionsError } = await supabase
-        .from('questions')
-        .select('id, quiz_id')
-        .limit(100);
-        
-      if (!allQuestionsError && allQuestions) {
-        console.log('All questions in database (first 100):', allQuestions);
-        const matchingQuestions = allQuestions.filter(q => q.quiz_id === quiz.id);
-        console.log('Questions matching this quiz_id by filter:', matchingQuestions);
-      }
-      
-      console.log('Found questions count:', questions?.length || 0);
+      console.log('Found questions count with new RLS policies:', questions?.length || 0);
       
       // Add detailed debugging for questions
       if (questions && questions.length > 0) {
