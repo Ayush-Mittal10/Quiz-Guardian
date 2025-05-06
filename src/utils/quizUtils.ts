@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, QuizQuestion, QuizSettings, Warning, JsonWarning } from '@/types';
 
@@ -149,7 +150,7 @@ export async function createInitialAttempt(
   try {
     console.log(`Creating initial attempt for student ${studentId} on quiz ${quizId}`);
     
-    // First, check if the student has already attempted this quiz
+    // First, check if the student has already submitted this quiz
     const { data: existingAttempts, error: checkError } = await supabase
       .from('quiz_attempts')
       .select('id, answers, submitted_at')

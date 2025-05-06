@@ -68,6 +68,11 @@ const TakeQuiz = () => {
               description: result.message || "Failed to initialize quiz attempt",
               variant: "destructive",
             });
+            
+            // If the message indicates they already submitted, redirect to the dashboard
+            if (result.message?.includes("already submitted")) {
+              navigate('/dashboard');
+            }
           }
         } catch (err) {
           console.error("Error initializing attempt:", err);
@@ -78,17 +83,28 @@ const TakeQuiz = () => {
     }
   }, [quiz, user]);
   
+  // Update answers in the database when user answers a question
+  const saveAnswersToDatabase = async (updatedAnswers: Record<string, number[]>) => {
+    if (!attemptId || Object.keys(updatedAnswers).length === 0) return;
+    
+    console.log("Saving answers to database...");
+    try {
+      await updateQuizAttemptAnswers(attemptId, updatedAnswers);
+    } catch (error) {
+      console.error("Error updating answers:", error);
+    }
+  };
+  
   // Update answers in the database periodically
   useEffect(() => {
     if (!attemptId || Object.keys(answers).length === 0) return;
     
-    const updateInterval = setInterval(async () => {
-      console.log("Updating answers in database...");
-      try {
-        await updateQuizAttemptAnswers(attemptId, answers);
-      } catch (error) {
-        console.error("Error updating answers:", error);
-      }
+    // Save immediately when answers change
+    saveAnswersToDatabase(answers);
+    
+    const updateInterval = setInterval(() => {
+      console.log("Periodic update of answers...");
+      saveAnswersToDatabase(answers);
     }, 30000); // Update every 30 seconds
     
     return () => clearInterval(updateInterval);
@@ -244,6 +260,11 @@ const TakeQuiz = () => {
     }
     
     setAnswers(updatedAnswers);
+    
+    // Save answers to the database when the user selects an answer
+    if (attemptId) {
+      saveAnswersToDatabase(updatedAnswers);
+    }
   };
   
   const goToNextQuestion = () => {

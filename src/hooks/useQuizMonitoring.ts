@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -14,6 +13,7 @@ export type MonitoringStudent = {
   warnings: Warning[];
   attemptId: string;
   answers: Record<string, number[]>;
+  status: 'in_progress' | 'submitted';
 };
 
 export const useQuizMonitoring = (quizId: string | undefined) => {
@@ -84,7 +84,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
       setTotalQuestions(count || 0);
       console.log('Total questions count:', count);
       
-      // Fetch ongoing attempts - Specifically get attempts where submitted_at is null
+      // Fetch ALL attempts for this quiz
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('quiz_attempts')
         .select(`
@@ -95,15 +95,14 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
           answers,
           warnings
         `)
-        .eq('quiz_id', quizId)
-        .is('submitted_at', null); // This ensures we only get ongoing attempts
+        .eq('quiz_id', quizId);
       
       if (attemptsError) {
         console.error('Error fetching attempts:', attemptsError);
         throw attemptsError;
       }
       
-      console.log('Fetched ongoing attempts:', attemptsData?.length || 0, attemptsData);
+      console.log('Fetched all attempts:', attemptsData?.length || 0, attemptsData);
       
       // Get student profile information
       const studentIds = attemptsData?.map(attempt => attempt.student_id) || [];
@@ -135,8 +134,27 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         return acc;
       }, {} as Record<string, { id: string; name: string }>);
       
+      // Format student data - we'll group by student_id to handle both in-progress and submitted attempts
+      const studentAttempts = new Map<string, any>();
+      
+      attemptsData?.forEach(attempt => {
+        // For each student, keep the most recent attempt
+        if (!studentAttempts.has(attempt.student_id) || 
+            // If submitted_at is null (in progress), prioritize it
+            (attempt.submitted_at === null && studentAttempts.get(attempt.student_id).submitted_at !== null) ||
+            // Or if both have submitted_at values, take the more recent one
+            (attempt.submitted_at !== null && 
+             studentAttempts.get(attempt.student_id).submitted_at !== null &&
+             new Date(attempt.submitted_at) > new Date(studentAttempts.get(attempt.student_id).submitted_at))) {
+          
+          studentAttempts.set(attempt.student_id, attempt);
+        }
+      });
+      
+      console.log('Processed student attempts:', studentAttempts.size);
+      
       // Format student data
-      const formattedStudents: MonitoringStudent[] = attemptsData?.map(attempt => {
+      const formattedStudents: MonitoringStudent[] = Array.from(studentAttempts.values()).map(attempt => {
         const profile = profileLookup[attempt.student_id] || { id: attempt.student_id, name: 'Unknown Student' };
         
         // Calculate time elapsed
@@ -164,12 +182,16 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
           timeElapsed,
           warnings,
           attemptId: attempt.id,
-          answers: answers
+          answers: answers,
+          status: attempt.submitted_at === null ? 'in_progress' : 'submitted'
         };
-      }) || [];
+      });
       
-      console.log('Formatted students data:', formattedStudents.length);
-      setStudents(formattedStudents);
+      // Only display in-progress attempts in the monitoring view
+      const inProgressStudents = formattedStudents.filter(student => student.status === 'in_progress');
+      
+      console.log('Formatted in-progress students data:', inProgressStudents.length);
+      setStudents(inProgressStudents);
     } catch (error: any) {
       console.error('Error fetching monitoring data:', error);
       toast({
@@ -310,7 +332,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         },
         (payload) => {
           console.log('Quiz attempt updated:', payload);
-          // If a student submitted, refresh the data
+          // If a student submitted or updated answers, refresh the data
           fetchStudentData();
         }
       )

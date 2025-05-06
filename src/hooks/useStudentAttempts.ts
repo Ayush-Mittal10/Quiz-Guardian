@@ -20,6 +20,7 @@ export function useStudentAttempts() {
       setIsLoading(true);
       
       try {
+        // Only fetch submitted attempts (where submitted_at is not null)
         const { data, error: attemptsError } = await supabase
           .from('quiz_attempts')
           .select(`
@@ -35,6 +36,7 @@ export function useStudentAttempts() {
             quizzes(title, test_id)
           `)
           .eq('student_id', user.id)
+          .not('submitted_at', 'is', null) // Only get submitted attempts
           .order('started_at', { ascending: false });
         
         if (attemptsError) throw attemptsError;
