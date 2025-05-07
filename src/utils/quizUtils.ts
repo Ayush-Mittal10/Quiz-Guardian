@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, QuizQuestion, QuizSettings, Warning, JsonWarning } from '@/types';
 
@@ -146,14 +145,22 @@ export async function saveQuiz(
 export async function createInitialAttempt(
   quizId: string,
   studentId: string
-): Promise<{ success: boolean; id?: string; attemptId?: string; answers?: Record<string, number[]>; message?: string; error?: any }> {
+): Promise<{ 
+  success: boolean; 
+  id?: string; 
+  attemptId?: string; 
+  answers?: Record<string, number[]>; 
+  warnings?: Warning[]; 
+  message?: string; 
+  error?: any 
+}> {
   try {
     console.log(`Creating initial attempt for student ${studentId} on quiz ${quizId}`);
     
     // First, check if the student has already submitted this quiz
     const { data: existingAttempts, error: checkError } = await supabase
       .from('quiz_attempts')
-      .select('id, answers, submitted_at')
+      .select('id, answers, submitted_at, warnings')
       .eq('quiz_id', quizId)
       .eq('student_id', studentId);
     
@@ -178,10 +185,22 @@ export async function createInitialAttempt(
       const ongoingAttempt = existingAttempts.find(attempt => attempt.submitted_at === null);
       if (ongoingAttempt) {
         console.log('Ongoing attempt found, returning ID:', ongoingAttempt.id);
+        
+        // Parse warnings from the database
+        let warnings: Warning[] = [];
+        if (ongoingAttempt.warnings && Array.isArray(ongoingAttempt.warnings)) {
+          warnings = ongoingAttempt.warnings.map((w: any) => ({
+            timestamp: w.timestamp || new Date().toISOString(),
+            type: w.type || 'focus-loss',
+            description: w.description || ''
+          }));
+        }
+        
         return {
           success: true,
           attemptId: ongoingAttempt.id,
-          answers: ongoingAttempt.answers as Record<string, number[]> || {}
+          answers: ongoingAttempt.answers as Record<string, number[]> || {},
+          warnings: warnings
         };
       }
     }
@@ -208,14 +227,16 @@ export async function createInitialAttempt(
     
     return {
       success: true,
-      id: attemptData.id
+      id: attemptData.id,
+      warnings: []
     };
   } catch (error: any) {
     console.error('Error creating initial attempt:', error);
     return {
       success: false,
       error,
-      message: error.message || 'An error occurred while creating the attempt'
+      message: error.message || 'An error occurred while creating the attempt',
+      warnings: []
     };
   }
 }

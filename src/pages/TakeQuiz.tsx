@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,8 @@ const TakeQuiz = () => {
           if (result.success && result.id) {
             console.log("Initial attempt created with ID:", result.id);
             setAttemptId(result.id);
+            // Initialize with empty warnings array
+            setWarnings(result.warnings || []);
           } else if (result.attemptId) {
             // If there's an existing attempt, use that ID
             console.log("Existing attempt found:", result.attemptId);
@@ -69,6 +72,9 @@ const TakeQuiz = () => {
             if (result.warnings && Array.isArray(result.warnings)) {
               console.log("Loading existing warnings:", result.warnings);
               setWarnings(result.warnings);
+            } else {
+              // Initialize with empty warnings array if none exists
+              setWarnings([]);
             }
           } else {
             console.error("Failed to create initial attempt:", result.error || result.message);
