@@ -43,63 +43,69 @@ export const StudentResultsTable = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedAttempts.map((result) => (
-            <TableRow
-              key={result.id}
-              className={selectedStudent === result.studentId ? 'bg-blue-50' : ''}
-            >
-              <TableCell>
-                <div>{result.student?.name || 'Unknown Student'}</div>
-                <div className="text-xs text-muted-foreground">{result.student?.email || ''}</div>
-              </TableCell>
-              <TableCell>
-                <div className={`font-medium ${
-                  (result.score || 0) >= 70 ? 'text-green-600' :
-                  (result.score || 0) >= 50 ? 'text-amber-600' : 'text-red-600'
-                }`}>
-                  {result.score || 0}%
-                </div>
-              </TableCell>
-              <TableCell>{result.timeSpent ? formatTime(result.timeSpent) : '00:00'}</TableCell>
-              <TableCell>
-                <div>{result.submittedAt ? new Date(result.submittedAt).toLocaleDateString() : 'Not submitted'}</div>
-                <div className="text-xs text-muted-foreground">
-                  {result.submittedAt ? new Date(result.submittedAt).toLocaleTimeString() : ''}
-                </div>
-              </TableCell>
-              <TableCell>
-                {result.warnings && result.warnings.length > 0 ? (
-                  <span className="text-red-500">{result.warnings.length}</span>
-                ) : (
-                  <span className="text-green-500">0</span>
-                )}
-              </TableCell>
-              <TableCell>
-                {result.autoSubmitted ? (
-                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
-                    Auto-submitted
-                  </span>
-                ) : result.warnings && result.warnings.length > 0 ? (
-                  <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
-                    Warning
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                    Good
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => onSelectStudent(result.studentId)}
-                >
-                  View
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
+          {sortedAttempts.map((result) => {
+            // Ensure warnings is an array, not undefined
+            const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+            const warningsCount = warnings.length;
+            
+            return (
+              <TableRow
+                key={result.id}
+                className={selectedStudent === result.studentId ? 'bg-blue-50' : ''}
+              >
+                <TableCell>
+                  <div>{result.student?.name || 'Unknown Student'}</div>
+                  <div className="text-xs text-muted-foreground">{result.student?.email || ''}</div>
+                </TableCell>
+                <TableCell>
+                  <div className={`font-medium ${
+                    (result.score || 0) >= 70 ? 'text-green-600' :
+                    (result.score || 0) >= 50 ? 'text-amber-600' : 'text-red-600'
+                  }`}>
+                    {result.score || 0}%
+                  </div>
+                </TableCell>
+                <TableCell>{result.timeSpent ? formatTime(result.timeSpent) : '00:00'}</TableCell>
+                <TableCell>
+                  <div>{result.submittedAt ? new Date(result.submittedAt).toLocaleDateString() : 'Not submitted'}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {result.submittedAt ? new Date(result.submittedAt).toLocaleTimeString() : ''}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {warningsCount > 0 ? (
+                    <span className="text-red-500">{warningsCount}</span>
+                  ) : (
+                    <span className="text-green-500">0</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {result.autoSubmitted ? (
+                    <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
+                      Auto-submitted
+                    </span>
+                  ) : warningsCount > 0 ? (
+                    <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
+                      Warning
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                      Good
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => onSelectStudent(result.studentId)}
+                  >
+                    View
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
 
           {attempts.length === 0 && (
             <TableRow>

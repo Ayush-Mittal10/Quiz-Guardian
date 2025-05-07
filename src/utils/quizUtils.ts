@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, QuizQuestion, QuizSettings, Warning, JsonWarning } from '@/types';
 
@@ -277,6 +278,11 @@ export async function saveQuizAttempt(
 ): Promise<{ success: boolean; id: string; error?: any; message?: string }> {
   try {
     console.log(`Submitting quiz attempt ${attemptId} for student ${studentId}`);
+    console.log(`Warnings count being saved: ${warnings.length}`);
+    
+    if (warnings.length > 0) {
+      console.log('Warning details being saved:', JSON.stringify(warnings.slice(0, 2)));
+    }
     
     // Calculate the score by comparing answers with correct answers
     const { data: questions, error: questionsError } = await supabase
@@ -317,6 +323,8 @@ export async function saveQuizAttempt(
       description: warning.description
     }));
     
+    console.log(`Saving ${jsonWarnings.length} warnings to database for attempt ${attemptId}`);
+    
     // Update the attempt with submission data
     const { data: attemptData, error: attemptError } = await supabase
       .from('quiz_attempts')
@@ -333,6 +341,15 @@ export async function saveQuizAttempt(
     
     if (attemptError) {
       throw attemptError;
+    }
+    
+    // Verify warnings were saved correctly
+    if (jsonWarnings.length > 0) {
+      console.log('Attempt data after update:', JSON.stringify({
+        id: attemptData.id,
+        warnings_count: Array.isArray(attemptData.warnings) ? attemptData.warnings.length : 0,
+        auto_submitted: attemptData.auto_submitted
+      }));
     }
     
     return {

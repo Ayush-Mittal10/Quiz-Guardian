@@ -52,6 +52,12 @@ export const useQuizResults = (quizId: string | undefined) => {
           
         if (attemptsError) throw attemptsError;
         
+        console.log('Fetched attempts raw data:', attemptsData?.map(a => ({
+          id: a.id, 
+          warnings: a.warnings ? (Array.isArray(a.warnings) ? a.warnings.length : 'not array') : 'none',
+          auto_submitted: a.auto_submitted
+        })));
+        
         // Get student profiles separately
         const studentIds = attemptsData.map(attempt => attempt.student_id);
         
@@ -146,12 +152,34 @@ export const useQuizResults = (quizId: string | undefined) => {
           };
           
           // Safely parse warnings from JSON to our Warning type
-          const warningsArray = Array.isArray(attempt.warnings) ? attempt.warnings : [];
-          const parsedWarnings: Warning[] = warningsArray.map((warning: any) => ({
-            type: warning?.type || 'focus-loss',
-            timestamp: warning?.timestamp || new Date().toISOString(),
-            description: warning?.description || ''
-          }));
+          let parsedWarnings: Warning[] = [];
+          
+          // Log what's coming from the database to troubleshoot
+          console.log(`Processing warnings for attempt ${attempt.id}:`, 
+            attempt.warnings ? 
+              (typeof attempt.warnings === 'object' ? 
+                (Array.isArray(attempt.warnings) ? `Array of ${attempt.warnings.length}` : 'Object') 
+                : typeof attempt.warnings) 
+              : 'null/undefined');
+          
+          if (attempt.warnings) {
+            if (Array.isArray(attempt.warnings)) {
+              parsedWarnings = attempt.warnings.map((warning: any) => ({
+                type: warning?.type || 'focus-loss',
+                timestamp: warning?.timestamp || new Date().toISOString(),
+                description: warning?.description || ''
+              }));
+            } else if (typeof attempt.warnings === 'object') {
+              // Try to convert object to array if possible
+              parsedWarnings = Object.values(attempt.warnings).map((warning: any) => ({
+                type: warning?.type || 'focus-loss',
+                timestamp: warning?.timestamp || new Date().toISOString(),
+                description: warning?.description || ''
+              }));
+            }
+          }
+          
+          console.log(`Parsed ${parsedWarnings.length} warnings for attempt ${attempt.id}`);
           
           // Calculate time spent between start and submission time
           const startTime = new Date(attempt.started_at).getTime();
@@ -173,6 +201,9 @@ export const useQuizResults = (quizId: string | undefined) => {
             timeSpent: timeSpent
           };
         });
+        
+        console.log('Formatted attempts with warning counts:', 
+          formattedAttempts.map(a => ({id: a.id, warnings: a.warnings?.length || 0, autoSubmitted: a.autoSubmitted})));
         
         setQuiz(formattedQuiz);
         setAttempts(formattedAttempts);

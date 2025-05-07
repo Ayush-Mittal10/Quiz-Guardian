@@ -11,7 +11,11 @@ const QuizSubmitted = () => {
     quizId: string;
     autoSubmitted: boolean;
     warnings: number;
+    quizTitle?: string;
   } || { quizId: '', autoSubmitted: false, warnings: 0 };
+
+  // Ensure warnings is a number and not undefined
+  const warningsCount = typeof state.warnings === 'number' ? state.warnings : 0;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -33,7 +37,7 @@ const QuizSubmitted = () => {
                   Your quiz was automatically submitted due to potential academic integrity violations.
                 </p>
                 <p className="text-sm text-red-700">
-                  {state.warnings} warning{state.warnings !== 1 ? 's' : ''} were recorded during your session.
+                  {warningsCount} warning{warningsCount !== 1 ? 's' : ''} were recorded during your session.
                 </p>
               </div>
             ) : (
@@ -41,9 +45,9 @@ const QuizSubmitted = () => {
                 <p className="text-green-800">
                   Your answers have been recorded successfully.
                 </p>
-                {state.warnings > 0 && (
+                {warningsCount > 0 && (
                   <p className="text-sm text-amber-600 mt-2">
-                    Note: {state.warnings} warning{state.warnings !== 1 ? 's' : ''} were recorded during your session.
+                    Note: {warningsCount} warning{warningsCount !== 1 ? 's' : ''} were recorded during your session.
                   </p>
                 )}
               </div>

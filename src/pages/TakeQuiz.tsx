@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -263,6 +262,8 @@ const TakeQuiz = () => {
   const addWarning = (type: 'tab-switch' | 'focus-loss' | 'multiple-faces' | 'no-face', description: string) => {
     if (!quiz || !attemptId) return;
     
+    console.log(`Adding warning: ${type} - ${description}`);
+    
     const newWarning: Warning = {
       timestamp: new Date().toISOString(),
       type,
@@ -282,6 +283,8 @@ const TakeQuiz = () => {
         type: warning.type,
         description: warning.description
       }));
+      
+      console.log(`Total warnings now: ${updatedWarnings.length}`);
       
       // Update warnings in the database
       if (attemptId) {
@@ -368,6 +371,8 @@ const TakeQuiz = () => {
     setSubmitting(true);
     
     try {
+      console.log(`Submitting quiz with ${warnings.length} warnings, autoSubmitted=${autoSubmitted}`);
+      
       const result = await saveQuizAttempt(
         attemptId,
         quiz.id,
@@ -378,6 +383,8 @@ const TakeQuiz = () => {
       );
       
       if (result.success) {
+        console.log(`Quiz submitted successfully. Warnings: ${warnings.length}`);
+        
         navigate('/quiz-submitted', { 
           state: { 
             quizId: quiz.id,

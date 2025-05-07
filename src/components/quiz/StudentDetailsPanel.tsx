@@ -18,6 +18,10 @@ export const StudentDetailsPanel = ({ attempt, onClose }: StudentDetailsPanelPro
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Ensure warnings is an array, not undefined
+  const warnings = Array.isArray(attempt.warnings) ? attempt.warnings : [];
+  const warningsCount = warnings.length;
+
   // Fetch questions for this quiz
   useEffect(() => {
     const fetchQuizQuestions = async () => {
@@ -80,7 +84,19 @@ export const StudentDetailsPanel = ({ attempt, onClose }: StudentDetailsPanelPro
               <div>
                 <div className="text-sm text-muted-foreground">Submission Status</div>
                 <div className="font-medium">
-                  {attempt.autoSubmitted ? 'Auto-submitted' : attempt.submittedAt ? 'Submitted' : 'Not submitted'}
+                  {attempt.autoSubmitted ? (
+                    <span className="text-red-600">Auto-submitted</span>
+                  ) : attempt.submittedAt ? (
+                    'Submitted'
+                  ) : (
+                    'Not submitted'
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Warnings</div>
+                <div className={`font-medium ${warningsCount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {warningsCount} {warningsCount === 1 ? 'warning' : 'warnings'}
                 </div>
               </div>
             </div>
@@ -89,16 +105,23 @@ export const StudentDetailsPanel = ({ attempt, onClose }: StudentDetailsPanelPro
           {/* Warning Logs */}
           <Collapsible>
             <CollapsibleTrigger asChild>
-              <Button variant="outline" className="flex w-full justify-between">
-                <span>Warning Logs ({attempt.warnings?.length || 0})</span>
-                <span className="text-xs">{attempt.warnings?.length ? 'Click to view' : 'No warnings'}</span>
+              <Button 
+                variant={warningsCount > 0 ? "destructive" : "outline"} 
+                className="flex w-full justify-between"
+              >
+                <span>Warning Logs ({warningsCount})</span>
+                <span className="text-xs">
+                  {warningsCount 
+                    ? `${attempt.autoSubmitted ? 'Auto-submitted due to warnings' : 'Click to view'}` 
+                    : 'No warnings'}
+                </span>
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2">
               <div className="border rounded-md p-3">
-                {attempt.warnings?.length ? (
+                {warningsCount > 0 ? (
                   <div className="space-y-2">
-                    {attempt.warnings.map((warning, index) => (
+                    {warnings.map((warning, index) => (
                       <div key={index} className="text-sm border-b pb-2">
                         <div className="text-red-500">{warning.type}</div>
                         <div className="text-xs text-muted-foreground">
