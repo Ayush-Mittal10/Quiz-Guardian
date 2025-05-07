@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -332,7 +333,7 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         },
         (payload) => {
           console.log('Quiz attempt updated:', payload);
-          // If a student submitted or updated answers, refresh the data
+          // If a student submitted or updated answers/warnings, refresh the data
           fetchStudentData();
         }
       )

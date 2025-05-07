@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { AlertTriangle, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -14,7 +14,10 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnectionError, setIsConnectionError] = useState(false);
+  const [faceDetected, setFaceDetected] = useState<boolean>(true);
+  const [multipleFaces, setMultipleFaces] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const detectionInterval = useRef<number | null>(null);
   
   // For demo purposes, we'll simulate getting a stream from the remote student
   useEffect(() => {
@@ -44,6 +47,9 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
           }
           
           setVideoFeed('active');
+          
+          // Start simulated face detection
+          startFaceDetection();
         } else {
           console.error('Media devices not available');
           setIsConnectionError(true);
@@ -67,8 +73,40 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         mediaStream.getTracks().forEach(track => track.stop());
         videoRef.current.srcObject = null;
       }
+      
+      // Clear face detection interval
+      if (detectionInterval.current) {
+        clearInterval(detectionInterval.current);
+      }
     };
   }, [studentId]);
+  
+  // Simulate face detection (in a real app, use face-api.js or TensorFlow.js)
+  const startFaceDetection = () => {
+    if (detectionInterval.current) {
+      clearInterval(detectionInterval.current);
+    }
+    
+    // Simulate face detection - randomize results for demo purposes
+    detectionInterval.current = window.setInterval(() => {
+      // Simulate detection results:
+      // 80% chance of face detected
+      // 10% chance of no face
+      // 10% chance of multiple faces
+      const random = Math.random();
+      
+      if (random < 0.1) {
+        setFaceDetected(false);
+        setMultipleFaces(false);
+      } else if (random < 0.2) {
+        setFaceDetected(true);
+        setMultipleFaces(true);
+      } else {
+        setFaceDetected(true);
+        setMultipleFaces(false);
+      }
+    }, 3000);
+  };
   
   // Handle audio toggle
   useEffect(() => {
@@ -119,6 +157,21 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
                 {isAudioEnabled ? 'Audio on' : 'Audio off'}
               </span>
             </div>
+            
+            {/* Face detection status indicators */}
+            {!faceDetected && (
+              <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-md flex items-center gap-1 text-xs">
+                <AlertTriangle size={12} />
+                No face detected
+              </div>
+            )}
+            
+            {multipleFaces && (
+              <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-md flex items-center gap-1 text-xs">
+                <AlertTriangle size={12} />
+                Multiple faces
+              </div>
+            )}
           </>
         ) : videoFeed ? (
           <div className="h-full flex flex-col items-center justify-center">

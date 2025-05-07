@@ -27,6 +27,9 @@ const TakeQuiz = () => {
   const [submitting, setSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const [facesDetected, setFacesDetected] = useState<number>(0);
+  const videoCheckInterval = useRef<number | null>(null);
   
   useEffect(() => {
     if (quiz && !quiz.isActive) {
@@ -60,6 +63,12 @@ const TakeQuiz = () => {
             if (result.answers) {
               console.log("Loading existing answers");
               setAnswers(result.answers);
+            }
+            
+            // If there are existing warnings, load them
+            if (result.warnings && Array.isArray(result.warnings)) {
+              console.log("Loading existing warnings:", result.warnings);
+              setWarnings(result.warnings);
             }
           } else {
             console.error("Failed to create initial attempt:", result.error || result.message);
@@ -110,6 +119,7 @@ const TakeQuiz = () => {
     return () => clearInterval(updateInterval);
   }, [attemptId, answers]);
   
+  // Camera monitoring
   useEffect(() => {
     let stream: MediaStream | null = null;
     
@@ -118,8 +128,18 @@ const TakeQuiz = () => {
       
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          
+          // Initialize face detection if monitoring is enabled
+          if (quiz.settings.monitoringEnabled) {
+            // We'll implement a simple simulation of face detection
+            // In a real application, you would use a library like face-api.js or TensorFlow.js
+            videoCheckInterval.current = window.setInterval(() => {
+              checkFaceDetection();
+            }, 5000); // Check every 5 seconds
+          }
         }
       } catch (error) {
         console.error('Error accessing camera:', error);
@@ -135,8 +155,55 @@ const TakeQuiz = () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      
+      if (videoCheckInterval.current) {
+        clearInterval(videoCheckInterval.current);
+      }
     };
   }, [quiz]);
+  
+  // Simple simulation of face detection
+  // In a real app, use face-api.js or TensorFlow.js for actual face detection
+  const checkFaceDetection = () => {
+    if (!quiz?.settings.monitoringEnabled || !videoRef.current) return;
+    
+    // Simulate face detection
+    // 0 = no face, 1 = one face, 2+ = multiple faces
+    const simulatedFaces = Math.floor(Math.random() * 3);
+    setFacesDetected(simulatedFaces);
+    
+    if (simulatedFaces === 0) {
+      console.log("No face detected");
+      addWarning('no-face', 'No face detected in camera');
+    } else if (simulatedFaces > 1) {
+      console.log("Multiple faces detected:", simulatedFaces);
+      addWarning('multiple-faces', `Multiple faces detected (${simulatedFaces})`);
+    }
+    
+    // Check for inactivity (simulate looking away or distracted)
+    const now = Date.now();
+    if (now - lastActivity > 30000) { // 30 seconds of inactivity
+      console.log("User inactive for too long");
+      addWarning('focus-loss', 'User inactive for extended period');
+    }
+  };
+  
+  // Update last activity timestamp on user interaction
+  useEffect(() => {
+    const updateActivity = () => {
+      setLastActivity(Date.now());
+    };
+    
+    window.addEventListener('mousemove', updateActivity);
+    window.addEventListener('keypress', updateActivity);
+    window.addEventListener('click', updateActivity);
+    
+    return () => {
+      window.removeEventListener('mousemove', updateActivity);
+      window.removeEventListener('keypress', updateActivity);
+      window.removeEventListener('click', updateActivity);
+    };
+  }, []);
   
   useEffect(() => {
     if (!quiz || timeLeft <= 0) return;
@@ -155,19 +222,23 @@ const TakeQuiz = () => {
     return () => clearInterval(timer);
   }, [quiz, timeLeft]);
   
+  // Enhanced tab visibility and focus monitoring
   useEffect(() => {
-    if (!quiz?.settings.monitoringEnabled) return;
+    if (!quiz?.settings.monitoringEnabled || !attemptId) return;
     
     const handleVisibilityChange = () => {
       if (document.hidden) {
+        console.log("Tab change detected - document hidden");
         addWarning('tab-switch', 'Tab change detected');
       }
     };
     
     const handleFocusLoss = () => {
+      console.log("Window focus lost");
       addWarning('focus-loss', 'Window focus lost');
     };
     
+    // These are the key event listeners for tab switching/focus loss
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleFocusLoss);
     
@@ -175,7 +246,7 @@ const TakeQuiz = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleFocusLoss);
     };
-  }, [quiz]);
+  }, [quiz, attemptId]);
   
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -215,13 +286,16 @@ const TakeQuiz = () => {
             .eq('id', attemptId)
             .then(({ error }) => {
               if (error) console.error("Error updating warnings:", error);
+              else console.log("Warning added and saved to database");
             });
         } catch (error) {
           console.error("Error updating warnings:", error);
         }
       }
       
+      // Auto-submit if warning limit reached
       if (updatedWarnings.length >= quiz.settings.allowedWarnings) {
+        console.log("Warning limit reached, auto-submitting quiz");
         submitQuiz(true);
       }
       
@@ -260,6 +334,7 @@ const TakeQuiz = () => {
     }
     
     setAnswers(updatedAnswers);
+    setLastActivity(Date.now()); // Update activity timestamp
     
     // Save answers to the database when the user selects an answer
     if (attemptId) {
@@ -270,12 +345,14 @@ const TakeQuiz = () => {
   const goToNextQuestion = () => {
     if (quiz && currentQuestionIndex < quiz.questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
+      setLastActivity(Date.now()); // Update activity timestamp
     }
   };
   
   const goToPrevQuestion = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1);
+      setLastActivity(Date.now()); // Update activity timestamp
     }
   };
   
@@ -366,7 +443,7 @@ const TakeQuiz = () => {
     );
   }
   
-  const currentQuestion = quiz.questions[currentQuestionIndex];
+  const currentQuestion = quiz?.questions?.[currentQuestionIndex];
   
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -379,13 +456,13 @@ const TakeQuiz = () => {
       
       <header className="bg-white shadow">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary">{quiz.title}</h1>
+          <h1 className="text-xl font-bold text-primary">{quiz?.title}</h1>
           <div className="flex items-center gap-4">
             <div className="text-lg font-bold text-red-600">
               Time Left: {formatTime(timeLeft)}
             </div>
             <div className="text-sm">
-              Warnings: {warnings.length}/{quiz.settings.allowedWarnings}
+              Warnings: {warnings.length}/{quiz?.settings.allowedWarnings || 3}
             </div>
           </div>
         </div>
@@ -398,16 +475,16 @@ const TakeQuiz = () => {
               <CardContent className="p-6">
                 <div className="mb-4 flex justify-between">
                   <span className="text-sm text-muted-foreground">
-                    Question {currentQuestionIndex + 1} of {quiz.questions.length}
+                    Question {currentQuestionIndex + 1} of {quiz?.questions?.length || 0}
                   </span>
                   <span className="text-sm font-medium">
-                    {currentQuestion.points} {currentQuestion.points === 1 ? 'point' : 'points'}
+                    {currentQuestion?.points} {currentQuestion?.points === 1 ? 'point' : 'points'}
                   </span>
                 </div>
                 
-                <h2 className="text-xl font-semibold mb-4">{currentQuestion.text}</h2>
+                <h2 className="text-xl font-semibold mb-4">{currentQuestion?.text}</h2>
                 
-                {currentQuestion.type === 'single-choice' ? (
+                {currentQuestion?.type === 'single-choice' ? (
                   <RadioGroup
                     value={(answers[currentQuestion.id]?.[0] ?? -1).toString()}
                     onValueChange={(value) => 
@@ -415,7 +492,7 @@ const TakeQuiz = () => {
                     }
                     className="space-y-3"
                   >
-                    {currentQuestion.options.map((option, index) => (
+                    {currentQuestion?.options.map((option, index) => (
                       <div key={index} className="flex items-center space-x-2 border p-3 rounded-md">
                         <RadioGroupItem value={index.toString()} id={`option-${index}`} />
                         <label htmlFor={`option-${index}`} className="flex-grow cursor-pointer">
@@ -426,13 +503,13 @@ const TakeQuiz = () => {
                   </RadioGroup>
                 ) : (
                   <div className="space-y-3">
-                    {currentQuestion.options.map((option, index) => (
+                    {currentQuestion?.options.map((option, index) => (
                       <div key={index} className="flex items-center space-x-2 border p-3 rounded-md">
                         <Checkbox
                           id={`option-${index}`}
-                          checked={(answers[currentQuestion.id] || []).includes(index)}
+                          checked={(answers[currentQuestion?.id] || []).includes(index)}
                           onCheckedChange={(checked) => 
-                            handleAnswerChange(currentQuestion.id, index, checked === true)
+                            handleAnswerChange(currentQuestion?.id, index, checked === true)
                           }
                         />
                         <label htmlFor={`option-${index}`} className="flex-grow cursor-pointer">
@@ -452,7 +529,7 @@ const TakeQuiz = () => {
                     Previous
                   </Button>
                   
-                  {currentQuestionIndex < quiz.questions.length - 1 ? (
+                  {quiz && currentQuestionIndex < quiz.questions.length - 1 ? (
                     <Button onClick={goToNextQuestion}>
                       Next
                     </Button>
@@ -472,7 +549,7 @@ const TakeQuiz = () => {
           <div className="md:col-span-1">
             <Card>
               <CardContent className="p-4">
-                {quiz.settings.monitoringEnabled && (
+                {quiz?.settings.monitoringEnabled && (
                   <>
                     <h3 className="text-sm font-medium mb-2">Monitoring</h3>
                     <div className="rounded-md overflow-hidden bg-black mb-2">
@@ -483,16 +560,26 @@ const TakeQuiz = () => {
                         className="w-full h-auto"
                       />
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground mb-3">
                       Stay in front of your camera and keep this window active.
                     </div>
+                    {warnings.length > 0 && (
+                      <div className="bg-red-50 p-2 rounded-md mb-3">
+                        <p className="text-xs font-medium text-red-800">
+                          Warnings: {warnings.length}/{quiz.settings.allowedWarnings}
+                        </p>
+                        <p className="text-xs text-red-700">
+                          Exceeding limit will auto-submit your quiz
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
                 
                 <div className="mt-4">
                   <h3 className="text-sm font-medium mb-2">Question Navigator</h3>
                   <div className="grid grid-cols-5 gap-1">
-                    {quiz.questions.map((_, index) => (
+                    {quiz?.questions?.map((_, index) => (
                       <Button
                         key={index}
                         variant={currentQuestionIndex === index ? "default" : 
