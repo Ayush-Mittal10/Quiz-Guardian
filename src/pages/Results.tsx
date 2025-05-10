@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -8,13 +9,27 @@ import { StudentResultsTable } from '@/components/quiz/StudentResultsTable';
 import { StudentDetailsPanel } from '@/components/quiz/StudentDetailsPanel';
 import { File } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const Results = () => {
   const { quizId } = useParams<{ quizId: string }>();
   const navigate = useNavigate();
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const { loading, quiz, attempts } = useQuizResults(quizId);
+  const { loading, quiz, attempts, refreshResults } = useQuizResults(quizId);
   const { toast } = useToast();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [attemptToDelete, setAttemptToDelete] = useState<{ id: string; studentName: string } | null>(null);
 
   if (loading) {
     return (
@@ -27,6 +42,48 @@ const Results = () => {
   const selectedAttempt = selectedStudent 
     ? attempts.find(a => a.studentId === selectedStudent) 
     : null;
+
+  const handleDeleteAttempt = async () => {
+    if (!attemptToDelete) return;
+    
+    try {
+      // Delete the attempt from the database
+      const { error } = await supabase
+        .from('quiz_attempts')
+        .delete()
+        .eq('id', attemptToDelete.id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Show success message
+      toast({
+        title: "Attempt deleted",
+        description: `${attemptToDelete.studentName}'s attempt has been deleted. They can now retake the quiz.`,
+      });
+      
+      // Clear selected student if that was the one deleted
+      const deletedAttempt = attempts.find(a => a.id === attemptToDelete.id);
+      if (deletedAttempt && deletedAttempt.studentId === selectedStudent) {
+        setSelectedStudent(null);
+      }
+      
+      // Refresh the data
+      refreshResults();
+    } catch (error: any) {
+      console.error("Error deleting attempt:", error);
+      toast({
+        title: "Error deleting attempt",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive"
+      });
+    }
+    
+    // Close the dialog and reset the attempt to delete
+    setDeleteDialogOpen(false);
+    setAttemptToDelete(null);
+  };
 
   const handleExportResults = () => {
     if (!attempts || attempts.length === 0) {
@@ -112,6 +169,10 @@ const Results = () => {
                 attempts={attempts}
                 selectedStudent={selectedStudent}
                 onSelectStudent={setSelectedStudent}
+                onDeleteAttempt={(attemptId, studentName) => {
+                  setAttemptToDelete({ id: attemptId, studentName });
+                  setDeleteDialogOpen(true);
+                }}
               />
             </CardContent>
           </Card>
@@ -124,6 +185,32 @@ const Results = () => {
           )}
         </div>
       </main>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Quiz Attempt</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {attemptToDelete?.studentName}'s quiz attempt? 
+              This action cannot be undone. The student will be able to retake the quiz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false);
+              setAttemptToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAttempt}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Delete Attempt
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

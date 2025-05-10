@@ -2,17 +2,20 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { QuizAttempt } from '@/types';
+import { Trash2 } from 'lucide-react';
 
 interface StudentResultsTableProps {
   attempts: QuizAttempt[];
   selectedStudent: string | null;
   onSelectStudent: (studentId: string) => void;
+  onDeleteAttempt?: (attemptId: string, studentName: string) => void;
 }
 
 export const StudentResultsTable = ({
   attempts,
   selectedStudent,
   onSelectStudent,
+  onDeleteAttempt,
 }: StudentResultsTableProps) => {
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -39,7 +42,7 @@ export const StudentResultsTable = ({
             <TableHead>Submitted</TableHead>
             <TableHead>Warnings</TableHead>
             <TableHead>Integrity</TableHead>
-            <TableHead>Details</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -95,13 +98,29 @@ export const StudentResultsTable = ({
                   )}
                 </TableCell>
                 <TableCell>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => onSelectStudent(result.studentId)}
-                  >
-                    View
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => onSelectStudent(result.studentId)}
+                    >
+                      View
+                    </Button>
+                    
+                    {onDeleteAttempt && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-500 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteAttempt(result.id, result.student?.name || 'Unknown Student');
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             );
