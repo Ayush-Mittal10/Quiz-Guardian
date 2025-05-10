@@ -252,6 +252,7 @@ const TakeQuiz = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
+  // Fix the addWarning function to ensure proper warning persistence
   const addWarning = (type: 'tab-switch' | 'focus-loss' | 'multiple-faces' | 'no-face', description: string) => {
     if (!quiz || !attemptId) return;
     
@@ -274,21 +275,25 @@ const TakeQuiz = () => {
       const jsonWarnings: JsonWarning[] = updatedWarnings.map(warning => ({
         timestamp: warning.timestamp,
         type: warning.type,
-        description: warning.description
+        description: warning.description || ''
       }));
       
       console.log(`Total warnings now: ${updatedWarnings.length}`);
+      console.log('JSON warnings to save:', JSON.stringify(jsonWarnings));
       
-      // Update warnings in the database
+      // Immediately update warnings in the database
       if (attemptId) {
         try {
           supabase
             .from('quiz_attempts')
             .update({ warnings: jsonWarnings })
             .eq('id', attemptId)
-            .then(({ error }) => {
-              if (error) console.error("Error updating warnings:", error);
-              else console.log("Warning added and saved to database");
+            .then(({ data, error }) => {
+              if (error) {
+                console.error("Error updating warnings:", error);
+              } else {
+                console.log("Warning added and saved to database:", data);
+              }
             });
         } catch (error) {
           console.error("Error updating warnings:", error);
@@ -296,7 +301,7 @@ const TakeQuiz = () => {
       }
       
       // Auto-submit if warning limit reached
-      if (updatedWarnings.length >= quiz.settings.allowedWarnings) {
+      if (updatedWarnings.length >= (quiz.settings.allowedWarnings || 3)) {
         console.log("Warning limit reached, auto-submitting quiz");
         submitQuiz(true);
       }
@@ -365,6 +370,7 @@ const TakeQuiz = () => {
     
     try {
       console.log(`Submitting quiz with ${warnings.length} warnings, autoSubmitted=${autoSubmitted}`);
+      console.log('Warning details being submitted:', JSON.stringify(warnings));
       
       const result = await saveQuizAttempt(
         attemptId,

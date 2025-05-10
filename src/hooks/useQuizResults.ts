@@ -55,7 +55,8 @@ export const useQuizResults = (quizId: string | undefined) => {
         console.log('Fetched attempts raw data:', attemptsData?.map(a => ({
           id: a.id, 
           warnings: a.warnings ? (Array.isArray(a.warnings) ? a.warnings.length : 'not array') : 'none',
-          auto_submitted: a.auto_submitted
+          auto_submitted: a.auto_submitted,
+          warnings_sample: a.warnings ? JSON.stringify(a.warnings).substring(0, 100) : 'no warnings'
         })));
         
         // Get student profiles separately
@@ -151,10 +152,10 @@ export const useQuizResults = (quizId: string | undefined) => {
             email: ''
           };
           
-          // Safely parse warnings from JSON to our Warning type
+          // Improved warning parsing
           let parsedWarnings: Warning[] = [];
           
-          // Log what's coming from the database to troubleshoot
+          // Better logging to troubleshoot
           console.log(`Processing warnings for attempt ${attempt.id}:`, 
             attempt.warnings ? 
               (typeof attempt.warnings === 'object' ? 
@@ -162,6 +163,7 @@ export const useQuizResults = (quizId: string | undefined) => {
                 : typeof attempt.warnings) 
               : 'null/undefined');
           
+          // More robust warning parsing
           if (attempt.warnings) {
             if (Array.isArray(attempt.warnings)) {
               parsedWarnings = attempt.warnings.map((warning: any) => ({
@@ -170,12 +172,38 @@ export const useQuizResults = (quizId: string | undefined) => {
                 description: warning?.description || ''
               }));
             } else if (typeof attempt.warnings === 'object') {
-              // Try to convert object to array if possible
-              parsedWarnings = Object.values(attempt.warnings).map((warning: any) => ({
-                type: warning?.type || 'focus-loss',
-                timestamp: warning?.timestamp || new Date().toISOString(),
-                description: warning?.description || ''
-              }));
+              // Try to handle non-array objects
+              try {
+                // Convert object to array if possible
+                const warningValues = Object.values(attempt.warnings);
+                if (Array.isArray(warningValues)) {
+                  parsedWarnings = warningValues.map((warning: any) => ({
+                    type: warning?.type || 'focus-loss',
+                    timestamp: warning?.timestamp || new Date().toISOString(),
+                    description: warning?.description || ''
+                  }));
+                }
+              } catch (e) {
+                console.error('Error parsing warnings object:', e);
+                // Fallback to empty array
+                parsedWarnings = [];
+              }
+            } else if (typeof attempt.warnings === 'string') {
+              // Try to parse from string if it might be JSON
+              try {
+                const parsed = JSON.parse(attempt.warnings);
+                if (Array.isArray(parsed)) {
+                  parsedWarnings = parsed.map((warning: any) => ({
+                    type: warning?.type || 'focus-loss',
+                    timestamp: warning?.timestamp || new Date().toISOString(),
+                    description: warning?.description || ''
+                  }));
+                }
+              } catch (e) {
+                console.error('Error parsing warnings string:', e);
+                // Fallback to empty array
+                parsedWarnings = [];
+              }
             }
           }
           
@@ -203,7 +231,13 @@ export const useQuizResults = (quizId: string | undefined) => {
         });
         
         console.log('Formatted attempts with warning counts:', 
-          formattedAttempts.map(a => ({id: a.id, warnings: a.warnings?.length || 0, autoSubmitted: a.autoSubmitted})));
+          formattedAttempts.map(a => ({
+            id: a.id, 
+            warnings: a.warnings?.length || 0, 
+            autoSubmitted: a.autoSubmitted,
+            warning_sample: a.warnings && a.warnings.length > 0 ? 
+              `${a.warnings[0].type} at ${a.warnings[0].timestamp}` : 'none'
+          })));
         
         setQuiz(formattedQuiz);
         setAttempts(formattedAttempts);

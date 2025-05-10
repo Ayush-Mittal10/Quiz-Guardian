@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { QuizAttempt, QuizQuestion, QuestionType } from '@/types';
+import { QuizAttempt, QuizQuestion, QuestionType, Warning } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 
 interface StudentDetailsPanelProps {
@@ -18,9 +18,18 @@ export const StudentDetailsPanel = ({ attempt, onClose }: StudentDetailsPanelPro
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Ensure warnings is an array, not undefined
+  // Ensure warnings is an array, not undefined or null
   const warnings = Array.isArray(attempt.warnings) ? attempt.warnings : [];
   const warningsCount = warnings.length;
+
+  console.log('StudentDetailsPanel - Attempt warnings:', 
+    Array.isArray(attempt.warnings) ? 
+      `Array with ${attempt.warnings.length} items` : 
+      `Not an array: ${typeof attempt.warnings}`);
+  
+  if (Array.isArray(attempt.warnings) && attempt.warnings.length > 0) {
+    console.log('Sample warning:', attempt.warnings[0]);
+  }
 
   // Fetch questions for this quiz
   useEffect(() => {

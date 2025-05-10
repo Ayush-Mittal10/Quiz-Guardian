@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { QuizSettings } from '@/types';
 import { AlertTriangle, Camera, Radio, Eye, Users } from 'lucide-react';

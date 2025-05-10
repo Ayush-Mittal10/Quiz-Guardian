@@ -44,7 +44,7 @@ export const StudentResultsTable = ({
         </TableHeader>
         <TableBody>
           {sortedAttempts.map((result) => {
-            // Ensure warnings is an array, not undefined
+            // Ensure warnings is properly processed
             const warnings = Array.isArray(result.warnings) ? result.warnings : [];
             const warningsCount = warnings.length;
             

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, QuizQuestion, QuizSettings, Warning, JsonWarning } from '@/types';
 
@@ -316,16 +315,18 @@ export async function saveQuizAttempt(
     // Calculate percentage score (rounded to nearest integer)
     const scorePercentage = Math.round((totalScore / totalPossibleScore) * 100);
     
-    // Convert warnings to JSON format suitable for database storage
+    // Ensure warnings are properly formatted for database storage
+    // Convert warnings to proper format for database storage
     const jsonWarnings: JsonWarning[] = warnings.map(warning => ({
       type: warning.type,
       timestamp: warning.timestamp,
-      description: warning.description
+      description: warning.description || ''
     }));
     
     console.log(`Saving ${jsonWarnings.length} warnings to database for attempt ${attemptId}`);
+    console.log('JSON warnings structure:', JSON.stringify(jsonWarnings));
     
-    // Update the attempt with submission data
+    // Update the attempt with submission data - ensure warnings are properly saved
     const { data: attemptData, error: attemptError } = await supabase
       .from('quiz_attempts')
       .update({
@@ -340,17 +341,17 @@ export async function saveQuizAttempt(
       .single();
     
     if (attemptError) {
+      console.error('Error updating quiz attempt:', attemptError);
       throw attemptError;
     }
     
     // Verify warnings were saved correctly
-    if (jsonWarnings.length > 0) {
-      console.log('Attempt data after update:', JSON.stringify({
-        id: attemptData.id,
-        warnings_count: Array.isArray(attemptData.warnings) ? attemptData.warnings.length : 0,
-        auto_submitted: attemptData.auto_submitted
-      }));
-    }
+    console.log('Attempt data after update:', {
+      id: attemptData.id,
+      warnings_count: Array.isArray(attemptData.warnings) ? attemptData.warnings.length : 'Not an array',
+      warnings_sample: attemptData.warnings ? JSON.stringify(attemptData.warnings).substring(0, 100) + '...' : 'No warnings',
+      auto_submitted: attemptData.auto_submitted
+    });
     
     return {
       success: true,
