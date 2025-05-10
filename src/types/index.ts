@@ -64,7 +64,7 @@ export interface QuizAttempt {
   student?: {
     id: string;
     name: string;
-    email: string;
+    email?: string; // Made email optional since it doesn't exist in profiles table
   };
   timeSpent?: number;
   quizTitle?: string;
