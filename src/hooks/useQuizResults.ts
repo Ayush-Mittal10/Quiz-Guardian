@@ -94,16 +94,13 @@ export const useQuizResults = (quizId: string | undefined) => {
         return;
       }
       
-      // Use auth.users to get emails
-      // This part would require admin privileges and may not work in all environments
-      // For now, let's get the profiles without emails
-      
+      // Use profiles table to get student information
+      // Check the available columns in the profiles table
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select(`
           id,
-          name,
-          email
+          name
         `)
         .in('id', studentIds);
         
@@ -113,13 +110,14 @@ export const useQuizResults = (quizId: string | undefined) => {
       }
       
       // Create a map for easy profile lookup
-      const profilesMap = new Map<string, { id: string; name: string; email: string }>();
+      const profilesMap = new Map<string, { id: string; name: string; email?: string }>();
       
       profilesData?.forEach(profile => {
         profilesMap.set(profile.id, {
           id: profile.id,
           name: profile.name || 'Unknown Student',
-          email: profile.email || ''
+          // Since 'email' is not in the profiles table, we'll omit it or set a default
+          email: ''
         });
       });
       
