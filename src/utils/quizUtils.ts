@@ -425,3 +425,38 @@ export async function deleteQuiz(
     };
   }
 }
+
+// New function to delete a specific quiz attempt
+export async function deleteQuizAttempt(
+  attemptId: string
+): Promise<{ success: boolean; error?: any }> {
+  try {
+    console.log('Deleting quiz attempt with ID:', attemptId);
+    
+    // Delete the specified quiz attempt
+    const { error } = await supabase
+      .from('quiz_attempts')
+      .delete()
+      .eq('id', attemptId);
+      
+    if (error) {
+      console.error('Error deleting quiz attempt:', error);
+      return {
+        success: false,
+        error
+      };
+    }
+    
+    console.log('Successfully deleted quiz attempt with ID:', attemptId);
+
+    return {
+      success: true
+    };
+  } catch (error) {
+    console.error('Error in deleteQuizAttempt function:', error);
+    return {
+      success: false,
+      error
+    };
+  }
+}

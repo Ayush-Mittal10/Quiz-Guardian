@@ -17,6 +17,8 @@ export const useQuizResults = (quizId: string | undefined) => {
     
     setLoading(true);
     try {
+      console.log('Fetching quiz and attempts for quiz ID:', quizId);
+      
       // Fetch quiz details
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
@@ -24,7 +26,12 @@ export const useQuizResults = (quizId: string | undefined) => {
         .eq('id', quizId)
         .single();
       
-      if (quizError) throw quizError;
+      if (quizError) {
+        console.error('Error fetching quiz data:', quizError);
+        throw quizError;
+      }
+      
+      console.log('Quiz data fetched successfully:', quizData?.id);
       
       // Fetch questions count
       const { count: questionCount, error: countError } = await supabase
@@ -34,7 +41,7 @@ export const useQuizResults = (quizId: string | undefined) => {
         
       if (countError) throw countError;
       
-      // Fetch attempts
+      // Fetch attempts with fresh data
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('quiz_attempts')
         .select(`
@@ -50,17 +57,15 @@ export const useQuizResults = (quizId: string | undefined) => {
         `)
         .eq('quiz_id', quizId);
         
-      if (attemptsError) throw attemptsError;
+      if (attemptsError) {
+        console.error('Error fetching attempts data:', attemptsError);
+        throw attemptsError;
+      }
       
-      console.log('Fetched attempts raw data:', attemptsData?.map(a => ({
-        id: a.id, 
-        warnings: a.warnings ? (Array.isArray(a.warnings) ? a.warnings.length : 'not array') : 'none',
-        auto_submitted: a.auto_submitted,
-        warnings_sample: a.warnings ? JSON.stringify(a.warnings).substring(0, 100) : 'no warnings'
-      })));
+      console.log(`Fetched ${attemptsData?.length || 0} attempts for quiz ID:`, quizId);
       
       // Get student profiles separately
-      const studentIds = attemptsData.map(attempt => attempt.student_id);
+      const studentIds = attemptsData?.map(attempt => attempt.student_id) || [];
       
       // Safely parse settings from JSON to our QuizSettings type
       const rawSettings = quizData.settings as Record<string, any>;
@@ -90,37 +95,22 @@ export const useQuizResults = (quizId: string | undefined) => {
       }
       
       // Use auth.users to get emails
-      // Note: This requires admin privileges and may not work in all environments
-      type UserData = {
-        users: Array<{
-          id: string;
-          email?: string;
-        }>;
-      };
-      
-      const { data: userEmailsData, error: userEmailsError } = await supabase.auth
-        .admin.listUsers({
-          perPage: 1000 // Adjust based on your expected user count
-        }) as { data: UserData | null, error: Error | null };
-      
-      let emailsMap = new Map<string, string>();
-      if (!userEmailsError && userEmailsData?.users) {
-        userEmailsData.users.forEach(user => {
-          if (user.id && user.email) {
-            emailsMap.set(user.id, user.email);
-          }
-        });
-      }
+      // This part would require admin privileges and may not work in all environments
+      // For now, let's get the profiles without emails
       
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select(`
           id,
-          name
+          name,
+          email
         `)
         .in('id', studentIds);
         
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error('Error fetching profiles data:', profilesError);
+        throw profilesError;
+      }
       
       // Create a map for easy profile lookup
       const profilesMap = new Map<string, { id: string; name: string; email: string }>();
@@ -128,9 +118,8 @@ export const useQuizResults = (quizId: string | undefined) => {
       profilesData?.forEach(profile => {
         profilesMap.set(profile.id, {
           id: profile.id,
-          name: profile.name,
-          // Get email from emailsMap or use empty string
-          email: emailsMap.get(profile.id) || ''
+          name: profile.name || 'Unknown Student',
+          email: profile.email || ''
         });
       });
       
@@ -146,7 +135,7 @@ export const useQuizResults = (quizId: string | undefined) => {
         questions: []
       };
       
-      const formattedAttempts: QuizAttempt[] = attemptsData.map(attempt => {
+      const formattedAttempts: QuizAttempt[] = attemptsData?.map(attempt => {
         const studentProfile = profilesMap.get(attempt.student_id) || {
           id: attempt.student_id,
           name: 'Unknown Student',
@@ -156,15 +145,7 @@ export const useQuizResults = (quizId: string | undefined) => {
         // Improved warning parsing
         let parsedWarnings: Warning[] = [];
         
-        // Better logging to troubleshoot
-        console.log(`Processing warnings for attempt ${attempt.id}:`, 
-          attempt.warnings ? 
-            (typeof attempt.warnings === 'object' ? 
-              (Array.isArray(attempt.warnings) ? `Array of ${attempt.warnings.length}` : 'Object') 
-              : typeof attempt.warnings) 
-            : 'null/undefined');
-        
-        // More robust warning parsing
+        // Better warning parsing
         if (attempt.warnings) {
           if (Array.isArray(attempt.warnings)) {
             parsedWarnings = attempt.warnings.map((warning: any) => ({
@@ -208,8 +189,6 @@ export const useQuizResults = (quizId: string | undefined) => {
           }
         }
         
-        console.log(`Parsed ${parsedWarnings.length} warnings for attempt ${attempt.id}`);
-        
         // Calculate time spent between start and submission time
         const startTime = new Date(attempt.started_at).getTime();
         const endTime = attempt.submitted_at ? new Date(attempt.submitted_at).getTime() : Date.now();
@@ -229,21 +208,14 @@ export const useQuizResults = (quizId: string | undefined) => {
           student: studentProfile,
           timeSpent: timeSpent
         };
-      });
+      }) || [];
       
-      console.log('Formatted attempts with warning counts:', 
-        formattedAttempts.map(a => ({
-          id: a.id, 
-          warnings: a.warnings?.length || 0, 
-          autoSubmitted: a.autoSubmitted,
-          warning_sample: a.warnings && a.warnings.length > 0 ? 
-            `${a.warnings[0].type} at ${a.warnings[0].timestamp}` : 'none'
-        })));
+      console.log(`Successfully formatted ${formattedAttempts.length} attempts for UI`);
       
       setQuiz(formattedQuiz);
       setAttempts(formattedAttempts);
     } catch (error: any) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching quiz results data:', error);
       toast({
         title: 'Error fetching results',
         description: error.message || 'Failed to load quiz results',

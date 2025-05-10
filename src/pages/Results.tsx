@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,31 @@ const Results = () => {
     
     try {
       console.log('Deleting attempt with ID:', attemptToDelete.id);
+      
+      // First verify the attempt exists before trying to delete it
+      const { data: attemptExists, error: checkError } = await supabase
+        .from('quiz_attempts')
+        .select('id')
+        .eq('id', attemptToDelete.id)
+        .single();
+        
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "row not found" which is fine
+        console.error('Error checking attempt existence:', checkError);
+        throw checkError;
+      }
+      
+      console.log('Attempt exists check:', attemptExists);
+      
+      if (!attemptExists && checkError?.code === 'PGRST116') {
+        console.log('Attempt does not exist in the database');
+        toast({
+          title: "Nothing to delete",
+          description: "This attempt has already been deleted.",
+        });
+        setDeleteDialogOpen(false);
+        setAttemptToDelete(null);
+        return;
+      }
       
       // Delete the attempt from the database
       const { error } = await supabase
