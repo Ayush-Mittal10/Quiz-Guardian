@@ -46,6 +46,8 @@ const Results = () => {
     if (!attemptToDelete) return;
     
     try {
+      console.log('Deleting attempt with ID:', attemptToDelete.id);
+      
       // Delete the attempt from the database
       const { error } = await supabase
         .from('quiz_attempts')
@@ -53,8 +55,11 @@ const Results = () => {
         .eq('id', attemptToDelete.id);
         
       if (error) {
+        console.error('Error from Supabase when deleting attempt:', error);
         throw error;
       }
+      
+      console.log('Supabase deletion complete - no error returned');
       
       // Show success message
       toast({
@@ -69,7 +74,8 @@ const Results = () => {
       }
       
       // Refresh the data
-      refreshResults();
+      await refreshResults();
+      console.log('Data refreshed after deletion');
     } catch (error: any) {
       console.error("Error deleting attempt:", error);
       toast({
@@ -77,11 +83,11 @@ const Results = () => {
         description: error.message || "An unexpected error occurred",
         variant: "destructive"
       });
+    } finally {
+      // Close the dialog and reset the attempt to delete
+      setDeleteDialogOpen(false);
+      setAttemptToDelete(null);
     }
-    
-    // Close the dialog and reset the attempt to delete
-    setDeleteDialogOpen(false);
-    setAttemptToDelete(null);
   };
 
   const handleExportResults = () => {
