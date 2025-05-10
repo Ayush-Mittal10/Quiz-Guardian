@@ -71,3 +71,45 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Face Detection Integrity Monitoring
+
+This project includes advanced face detection for monitoring student integrity during quizzes:
+
+### Features
+- Real-time face presence detection
+- Multiple faces detection
+- Gaze monitoring to detect looking away
+- Head pose estimation
+- Tab switching and focus loss detection
+
+### Implementation
+The face detection system uses:
+- face-api.js (TensorFlow.js based)
+- Client-side processing for privacy and performance
+- Configurable warning thresholds
+
+### Setup Face Detection
+
+Before running the application, download the required face-api.js models:
+
+```sh
+# Make the download script executable
+chmod +x download-face-models.sh
+
+# Run the script to download models
+./download-face-models.sh
+```
+
+This will download the necessary model files to the `public/models` directory.
+
+### Integration Points
+- `src/utils/faceDetectionUtils.ts` - Core face detection functionality
+- `src/pages/TakeQuiz.tsx` - Student-side implementation
+- `src/components/quiz/StudentVideoMonitor.tsx` - Professor monitoring view
+
+### Planned Future Enhancements
+- Voice activity monitoring
+- Foreign object detection
+- More sophisticated anti-cheating measures
+- Analytics dashboard for professors

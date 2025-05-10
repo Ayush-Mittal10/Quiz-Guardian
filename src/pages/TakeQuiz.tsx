@@ -10,6 +10,7 @@ import { useQuizByTestId } from '@/hooks/useQuizByTestId';
 import { saveQuizAttempt, createInitialAttempt, updateQuizAttemptAnswers } from '@/utils/quizUtils';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { initFaceDetection, startFaceMonitoring } from '@/utils/faceDetectionUtils';
 
 const TakeQuiz = () => {
   const { testId } = useParams<{ testId: string }>();
@@ -127,6 +128,7 @@ const TakeQuiz = () => {
   // Camera monitoring
   useEffect(() => {
     let stream: MediaStream | null = null;
+    let monitoringInterval: number | null = null;
     
     const startCamera = async () => {
       if (!quiz?.settings.monitoringEnabled) return;
@@ -139,11 +141,30 @@ const TakeQuiz = () => {
           
           // Initialize face detection if monitoring is enabled
           if (quiz.settings.monitoringEnabled) {
-            // We'll implement a simple simulation of face detection
-            // In a real application, you would use a library like face-api.js or TensorFlow.js
-            videoCheckInterval.current = window.setInterval(() => {
-              checkFaceDetection();
-            }, 5000); // Check every 5 seconds
+            // Initialize face-api.js models
+            const modelsLoaded = await initFaceDetection();
+            
+            if (modelsLoaded) {
+              // Start face monitoring once models are loaded
+              // Wait a moment for the video to initialize
+              setTimeout(() => {
+                if (videoRef.current) {
+                  monitoringInterval = startFaceMonitoring(
+                    videoRef.current,
+                    5000, // Check every 5 seconds
+                    lastActivity,
+                    (type, description) => {
+                      console.log(`Face monitoring violation: ${type} - ${description}`);
+                      addWarning(type, description);
+                      setFacesDetected(type === 'multiple-faces' ? 2 : type === 'no-face' ? 0 : 1);
+                    }
+                  );
+                }
+              }, 2000);
+            } else {
+              console.error('Failed to load face detection models');
+              addWarning('no-face', 'Face detection initialization failed');
+            }
           }
         }
       } catch (error) {
@@ -161,37 +182,11 @@ const TakeQuiz = () => {
         stream.getTracks().forEach(track => track.stop());
       }
       
-      if (videoCheckInterval.current) {
-        clearInterval(videoCheckInterval.current);
+      if (monitoringInterval) {
+        clearInterval(monitoringInterval);
       }
     };
   }, [quiz]);
-  
-  // Simple simulation of face detection
-  // In a real app, use face-api.js or TensorFlow.js for actual face detection
-  const checkFaceDetection = () => {
-    if (!quiz?.settings.monitoringEnabled || !videoRef.current) return;
-    
-    // Simulate face detection
-    // 0 = no face, 1 = one face, 2+ = multiple faces
-    const simulatedFaces = Math.floor(Math.random() * 3);
-    setFacesDetected(simulatedFaces);
-    
-    if (simulatedFaces === 0) {
-      console.log("No face detected");
-      addWarning('no-face', 'No face detected in camera');
-    } else if (simulatedFaces > 1) {
-      console.log("Multiple faces detected:", simulatedFaces);
-      addWarning('multiple-faces', `Multiple faces detected (${simulatedFaces})`);
-    }
-    
-    // Check for inactivity (simulate looking away or distracted)
-    const now = Date.now();
-    if (now - lastActivity > 30000) { // 30 seconds of inactivity
-      console.log("User inactive for too long");
-      addWarning('focus-loss', 'User inactive for extended period');
-    }
-  };
   
   // Update last activity timestamp on user interaction
   useEffect(() => {
@@ -232,10 +227,8 @@ const TakeQuiz = () => {
     if (!quiz?.settings.monitoringEnabled || !attemptId) return;
     
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log("Tab change detected - document hidden");
-        addWarning('tab-switch', 'Tab change detected');
-      }
+      console.log("Tab change detected - document hidden");
+      addWarning('tab-switch', 'Tab change detected');
     };
     
     const handleFocusLoss = () => {

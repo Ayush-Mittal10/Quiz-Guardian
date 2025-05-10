@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { QuizSettings } from '@/types';
-import { AlertTriangle, Camera, Radio } from 'lucide-react';
+import { AlertTriangle, Camera, Radio, Eye, Users } from 'lucide-react';
 
 interface MonitoringWarningProps {
   settings: QuizSettings;
@@ -38,13 +37,29 @@ export const MonitoringWarning: React.FC<MonitoringWarningProps> = ({ settings }
             <p className="text-xs text-gray-600">Do not switch to other tabs or applications</p>
           </div>
         </div>
+        
+        <div className="flex items-start gap-2">
+          <Eye className="text-amber-600 h-4 w-4 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium">Gaze Monitoring</p>
+            <p className="text-xs text-gray-600">Keep your eyes on the screen</p>
+          </div>
+        </div>
+        
+        <div className="flex items-start gap-2">
+          <Users className="text-amber-600 h-4 w-4 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium">Multiple Persons</p>
+            <p className="text-xs text-gray-600">Only one person should be visible in the camera</p>
+          </div>
+        </div>
       </div>
       
       <div className="bg-amber-100 p-3 rounded border border-amber-200">
         <p className="text-sm font-medium text-amber-800">Warning System</p>
         <p className="text-xs text-amber-700 mt-1">
           After {settings.allowedWarnings} integrity violations, your quiz will be automatically submitted.
-          Violations include: switching tabs, losing focus, no face detected, or multiple faces in view.
+          Violations include: switching tabs, losing focus, no face detected, multiple faces in view, or looking away from the screen.
         </p>
       </div>
     </div>

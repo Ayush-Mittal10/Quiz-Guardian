@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
+import { initFaceDetection, startFaceMonitoring, FaceDetectionResult, detectFaces } from '@/utils/faceDetectionUtils';
 
 interface StudentVideoMonitorProps {
   studentId: string | null;
@@ -16,17 +16,19 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   const [isConnectionError, setIsConnectionError] = useState(false);
   const [faceDetected, setFaceDetected] = useState<boolean>(true);
   const [multipleFaces, setMultipleFaces] = useState<boolean>(false);
+  const [lookingAway, setLookingAway] = useState<boolean>(false);
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const videoRef = useRef<HTMLVideoElement>(null);
   const detectionInterval = useRef<number | null>(null);
   
-  // For demo purposes, we'll simulate getting a stream from the remote student
+  // For demo purposes, we'll get a stream from the local camera to represent the remote student
   useEffect(() => {
     if (!studentId) {
       setVideoFeed(null);
       return;
     }
     
-    const simulateVideoFeed = async () => {
+    const connectVideoFeed = async () => {
       setIsLoading(true);
       setIsConnectionError(false);
       
@@ -48,8 +50,17 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
           
           setVideoFeed('active');
           
-          // Start simulated face detection
-          startFaceDetection();
+          // Initialize face detection models and start monitoring
+          const modelsLoaded = await initFaceDetection();
+          if (modelsLoaded) {
+            // Wait a moment for the video to initialize
+            setTimeout(() => {
+              startRealFaceDetection();
+            }, 2000);
+          } else {
+            console.error('Failed to load face detection models');
+            setIsConnectionError(true);
+          }
         } else {
           console.error('Media devices not available');
           setIsConnectionError(true);
@@ -64,7 +75,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
       }
     };
     
-    simulateVideoFeed();
+    connectVideoFeed();
     
     return () => {
       // Clean up video stream when component unmounts or student changes
@@ -81,29 +92,31 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
     };
   }, [studentId]);
   
-  // Simulate face detection (in a real app, use face-api.js or TensorFlow.js)
-  const startFaceDetection = () => {
+  // Real face detection using face-api.js
+  const startRealFaceDetection = () => {
     if (detectionInterval.current) {
       clearInterval(detectionInterval.current);
     }
     
-    // Simulate face detection - randomize results for demo purposes
-    detectionInterval.current = window.setInterval(() => {
-      // Simulate detection results:
-      // 80% chance of face detected
-      // 10% chance of no face
-      // 10% chance of multiple faces
-      const random = Math.random();
+    if (!videoRef.current) return;
+    
+    // Start periodic face detection
+    detectionInterval.current = window.setInterval(async () => {
+      if (!videoRef.current) return;
       
-      if (random < 0.1) {
-        setFaceDetected(false);
-        setMultipleFaces(false);
-      } else if (random < 0.2) {
-        setFaceDetected(true);
-        setMultipleFaces(true);
-      } else {
-        setFaceDetected(true);
-        setMultipleFaces(false);
+      try {
+        // Perform face detection
+        const result = await detectFaces(videoRef.current);
+        
+        // Update UI based on detection results
+        setFaceDetected(result.faceCount > 0);
+        setMultipleFaces(result.faceCount > 1);
+        setLookingAway(result.isLookingAway);
+        
+        // In a real implementation, this data would be sent to the server
+        // console.log('Face detection result:', result);
+      } catch (error) {
+        console.error('Error in face detection:', error);
       }
     }, 3000);
   };
@@ -170,6 +183,13 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
               <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-md flex items-center gap-1 text-xs">
                 <AlertTriangle size={12} />
                 Multiple faces
+              </div>
+            )}
+            
+            {lookingAway && (
+              <div className="absolute top-2 right-2 bg-orange-500 text-white px-2 py-1 rounded-md flex items-center gap-1 text-xs">
+                <AlertTriangle size={12} />
+                Looking away
               </div>
             )}
           </>
