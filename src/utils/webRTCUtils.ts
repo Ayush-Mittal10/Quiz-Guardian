@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { QuizAttemptUpdate } from '@/types/database';
+import { QuizAttemptUpdate, QuizAttemptRow } from '@/types/database';
 
 // Constants
 const ICE_SERVERS = {
@@ -24,6 +24,7 @@ export interface SignalingMessage {
 interface PeerConnection {
   connection: RTCPeerConnection;
   stream?: MediaStream;
+  pendingCandidates: RTCIceCandidate[];
 }
 
 // Connection maps - we store them here so they persist between renders
@@ -69,12 +70,6 @@ export const initStudentWebRTC = async (
       })
       .subscribe();
       
-    if (!signalChannel) {
-      console.error('Error subscribing to signaling channel');
-      onStatusChange?.('error');
-      return () => {};
-    }
-    
     subscriptions.push(signalChannel);
     
     // Notify that student is available (broadcasting presence)
@@ -158,11 +153,6 @@ export const initProfessorWebRTC = async (
       })
       .subscribe();
       
-    if (!signalChannel) {
-      console.error('Error subscribing to signaling channel');
-      return () => {};
-    }
-    
     subscriptions.push(signalChannel);
     
     // Return cleanup function
@@ -214,10 +204,34 @@ export const monitorStudent = async (
         return true;
       }
     }
+
+    // First check if student has monitoring available
+    const { data, error } = await supabase
+      .from('quiz_attempts')
+      .select('*')
+      .eq('quiz_id', quizId)
+      .eq('student_id', studentId)
+      .single();
+      
+    if (error) {
+      console.error('Error checking student monitoring status:', error);
+      return false;
+    }
+
+    // Use our custom QuizAttemptRow type to properly type the data
+    const attemptData = data as QuizAttemptRow;
+    
+    if (!attemptData || !attemptData.monitoring_available) {
+      console.error('Student monitoring not enabled for this attempt');
+      return false;
+    }
     
     // Create new peer connection for this student
     const peerConnection = new RTCPeerConnection(ICE_SERVERS);
-    peerConnections.set(studentId, { connection: peerConnection });
+    peerConnections.set(studentId, { 
+      connection: peerConnection,
+      pendingCandidates: []
+    });
     
     // Set up event handlers for the connection
     peerConnection.onconnectionstatechange = () => {
@@ -370,7 +384,7 @@ const handleIncomingSignal = async (
         }
       };
       
-      peer = { connection: peerConnection, stream: localStream };
+      peer = { connection: peerConnection, stream: localStream, pendingCandidates: [] };
       peerConnections.set(professorId, peer);
     }
     
@@ -379,6 +393,16 @@ const handleIncomingSignal = async (
       case 'offer':
         console.log('Received offer from professor, setting remote description');
         await peer.connection.setRemoteDescription(new RTCSessionDescription(signal.data));
+        
+        // Process any pending ICE candidates
+        if (peer.pendingCandidates.length > 0) {
+          console.log(`Processing ${peer.pendingCandidates.length} pending ICE candidates`);
+          for (const candidate of peer.pendingCandidates) {
+            await peer.connection.addIceCandidate(candidate);
+          }
+          peer.pendingCandidates = [];
+        }
+        
         const answer = await peer.connection.createAnswer();
         await peer.connection.setLocalDescription(answer);
         
@@ -396,9 +420,13 @@ const handleIncomingSignal = async (
       case 'ice-candidate':
         if (peer.connection.remoteDescription) {
           console.log('Student adding ICE candidate from professor');
-          await peer.connection.addIceCandidate(new RTCIceCandidate(signal.data));
+          await peer.connection.addIceCandidate(new RTCIceCandidate(signal.data))
+            .catch(err => {
+              console.error('Error adding ICE candidate:', err);
+            });
         } else {
-          console.warn('Received ICE candidate before remote description is set, buffering it for later');
+          console.log('Received ICE candidate before remote description is set, buffering it for later');
+          peer.pendingCandidates.push(new RTCIceCandidate(signal.data));
         }
         break;
     }
@@ -456,7 +484,7 @@ const handleProfessorSignal = async (
         }
       };
       
-      peer = { connection: peerConnection };
+      peer = { connection: peerConnection, pendingCandidates: [] };
       peerConnections.set(studentId, peer);
     }
     
@@ -464,15 +492,40 @@ const handleProfessorSignal = async (
     switch (signal.type) {
       case 'answer':
         console.log(`Professor received answer from student ${studentId}`);
-        await peer.connection.setRemoteDescription(new RTCSessionDescription(signal.data));
+        try {
+          const currentState = peer.connection.signalingState;
+          console.log(`Current signaling state: ${currentState}`);
+          
+          if (currentState !== 'have-local-offer') {
+            console.warn(`Cannot set remote description in state ${currentState}, ignoring answer`);
+            return;
+          }
+          
+          await peer.connection.setRemoteDescription(new RTCSessionDescription(signal.data));
+          
+          // Process any pending ICE candidates
+          if (peer.pendingCandidates.length > 0) {
+            console.log(`Processing ${peer.pendingCandidates.length} pending ICE candidates`);
+            for (const candidate of peer.pendingCandidates) {
+              await peer.connection.addIceCandidate(candidate);
+            }
+            peer.pendingCandidates = [];
+          }
+        } catch (error) {
+          console.error('Error handling professor signal:', error);
+        }
         break;
       
       case 'ice-candidate':
         if (peer.connection.remoteDescription) {
           console.log(`Professor adding ICE candidate from student ${studentId}`);
-          await peer.connection.addIceCandidate(new RTCIceCandidate(signal.data));
+          await peer.connection.addIceCandidate(new RTCIceCandidate(signal.data))
+            .catch(err => {
+              console.error('Error adding ICE candidate:', err);
+            });
         } else {
-          console.warn('Received ICE candidate before remote description is set');
+          console.log('Received ICE candidate before remote description is set, buffering for later');
+          peer.pendingCandidates.push(new RTCIceCandidate(signal.data));
         }
         break;
     }

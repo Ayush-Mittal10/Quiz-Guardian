@@ -24,8 +24,10 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   const [multipleFaces, setMultipleFaces] = useState<boolean>(false);
   const [lookingAway, setLookingAway] = useState<boolean>(false);
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const detectionInterval = useRef<number | null>(null);
+  const connectionRetryCount = useRef<number>(0);
   
   // Set up WebRTC connection to receive student's camera feed
   useEffect(() => {
@@ -37,6 +39,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
     const connectToStudent = async () => {
       setIsLoading(true);
       setIsConnectionError(false);
+      setErrorMessage('');
       setVideoFeed('connecting');
       
       try {
@@ -48,20 +51,22 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
           .eq('student_id', studentId)
           .single();
           
-        if (error || !data) {
-          console.error('Student monitoring not available:', error || 'Not enabled');
+        if (error) {
+          console.error('Error fetching student attempt:', error);
           setIsConnectionError(true);
+          setErrorMessage('Could not find student quiz attempt');
           setVideoFeed(null);
           setIsLoading(false);
           return;
         }
         
         // Use our custom QuizAttemptRow type to properly type the data
-        const attemptData = data as unknown as QuizAttemptRow;
+        const attemptData = data as QuizAttemptRow;
         
         if (!attemptData.monitoring_available) {
           console.error('Student monitoring not enabled for this attempt');
           setIsConnectionError(true);
+          setErrorMessage('Student monitoring is not enabled for this attempt');
           setVideoFeed(null);
           setIsLoading(false);
           return;
@@ -79,13 +84,16 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         if (!success) {
           console.error('Failed to establish WebRTC connection with student');
           setIsConnectionError(true);
+          setErrorMessage('Could not establish connection with student');
           setVideoFeed(null);
         } else {
           console.log('Successfully initiated monitoring request');
+          connectionRetryCount.current = 0;
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error connecting to student feed:', err);
         setIsConnectionError(true);
+        setErrorMessage(err.message || 'Unknown connection error');
         setVideoFeed(null);
       } finally {
         setIsLoading(false);
@@ -100,22 +108,36 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         const parsedData = JSON.parse(event.data);
         const { type, studentId: streamStudentId, stream } = parsedData;
         
-        console.log('Received message event:', type, streamStudentId);
+        if (type !== 'student-stream' || streamStudentId !== studentId) return;
         
-        if (type === 'student-stream' && streamStudentId === studentId && videoRef.current) {
-          console.log('Received student stream via WebRTC');
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play().catch(err => {
-              console.error('Error playing video:', err);
-            });
-          };
-          setVideoFeed('active');
-          setIsConnectionError(false);
-          
-          // Initialize face detection
-          startRealFaceDetection();
+        console.log('Received student stream via WebRTC');
+        
+        if (!videoRef.current) {
+          console.error('Video element not found');
+          return;
         }
+        
+        // Create a MediaStream object from the received stream
+        const mediaStream = stream;
+        
+        if (!mediaStream) {
+          console.error('Invalid media stream received');
+          return;
+        }
+        
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(err => {
+            console.error('Error playing video:', err);
+          });
+        };
+        
+        setVideoFeed('active');
+        setIsConnectionError(false);
+        setErrorMessage('');
+        
+        // Initialize face detection
+        startRealFaceDetection();
       } catch (error) {
         console.error('Error handling stream message:', error);
       }
@@ -199,9 +221,18 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
     if (studentId && quizId && user) {
       console.log(`Retrying connection to student ${studentId}`);
       
+      // Increment retry counter
+      connectionRetryCount.current += 1;
+      
+      if (connectionRetryCount.current > 3) {
+        setErrorMessage(`Multiple connection attempts failed. Please ensure the student has granted camera permissions.`);
+        return;
+      }
+      
       // Reset state to trigger reconnection
       setVideoFeed(null);
       setIsConnectionError(false);
+      setErrorMessage('');
       
       // Stop any existing monitoring
       stopMonitoringStudent(studentId);
@@ -220,6 +251,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
             if (!success) {
               console.error('Retry connection failed');
               setIsConnectionError(true);
+              setErrorMessage('Connection retry failed. Please try again later.');
             } else {
               console.log('Retry connection initiated');
               setVideoFeed('connecting');
@@ -228,8 +260,9 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
           .catch(err => {
             console.error('Error retrying connection:', err);
             setIsConnectionError(true);
+            setErrorMessage(`Connection error: ${err.message || 'Unknown error'}`);
           });
-      }, 500);
+      }, 1000);
     }
   };
   
@@ -294,7 +327,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
               <div className="flex flex-col items-center justify-center text-center p-4">
                 <AlertTriangle className="h-8 w-8 text-red-500 mb-2" />
                 <p className="text-white mb-2">Connection error</p>
-                <p className="text-gray-400 text-xs mb-4">Student's camera may not be available or connection was lost</p>
+                <p className="text-gray-400 text-xs mb-4">{errorMessage || "Student's camera may not be available or connection was lost"}</p>
                 <Button variant="outline" size="sm" onClick={retryConnection}>
                   Retry connection
                 </Button>
