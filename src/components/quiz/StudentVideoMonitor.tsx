@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Mic, MicOff, Video, VideoOff, RefreshCw } from 'lucide-react';
@@ -80,7 +81,8 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
     // Set up stream handling
     const handleStream = (event: MessageEvent) => {
       try {
-        const { type, studentId: streamStudentId, stream } = JSON.parse(event.data);
+        const parsedData = JSON.parse(event.data);
+        const { type, studentId: streamStudentId, stream } = parsedData;
         
         if (type === 'student-stream' && streamStudentId === studentId && videoRef.current) {
           console.log('Received student stream via WebRTC');
@@ -124,12 +126,15 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   }, [studentId, quizId, user]);
   
   // Real face detection using face-api.js
-  const startRealFaceDetection = () => {
+  const startRealFaceDetection = async () => {
     if (detectionInterval.current) {
       clearInterval(detectionInterval.current);
     }
     
     if (!videoRef.current) return;
+    
+    // Initialize face detection models if needed
+    await initFaceDetection();
     
     // Start periodic face detection
     detectionInterval.current = window.setInterval(async () => {

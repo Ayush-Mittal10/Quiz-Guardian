@@ -59,6 +59,11 @@ export const initStudentWebRTC = async (
         
         // Handle different types of signals
         await handleIncomingSignal(signal, quizId, studentId, localStream);
+        
+        // If we received an offer, the professor is trying to connect
+        if (signal.type === 'offer') {
+          onStatusChange?.('connected');
+        }
       })
       .subscribe();
       
@@ -71,10 +76,20 @@ export const initStudentWebRTC = async (
     subscriptions.push(signalChannel);
     
     // Notify that student is available (broadcasting presence)
-    await supabase.from('quiz_attempts')
-      .update({ monitoring_available: true })
-      .eq('quiz_id', quizId)
-      .eq('student_id', studentId);
+    try {
+      const { error: updateError } = await supabase.from('quiz_attempts')
+        .update({ monitoring_available: true })
+        .eq('quiz_id', quizId)
+        .eq('student_id', studentId);
+        
+      if (updateError) {
+        console.error('Error updating monitoring availability:', updateError);
+      } else {
+        console.log('Successfully marked monitoring as available');
+      }
+    } catch (err) {
+      console.error('Error updating monitoring_available flag:', err);
+    }
     
     // Return cleanup function
     return () => {
@@ -290,6 +305,11 @@ const handleIncomingSignal = async (
         }
       };
       
+      // Set connection state handling
+      peerConnection.onconnectionstatechange = () => {
+        console.log(`WebRTC connection state: ${peerConnection.connectionState}`);
+      };
+      
       peer = { connection: peerConnection, stream: localStream };
       peerConnections.set(professorId, peer);
     }
@@ -297,6 +317,7 @@ const handleIncomingSignal = async (
     // Handle the specific signal type
     switch (signal.type) {
       case 'offer':
+        console.log('Received offer from professor, setting remote description');
         await peer.connection.setRemoteDescription(new RTCSessionDescription(signal.data));
         const answer = await peer.connection.createAnswer();
         await peer.connection.setLocalDescription(answer);
@@ -313,7 +334,10 @@ const handleIncomingSignal = async (
       
       case 'ice-candidate':
         if (peer.connection.remoteDescription) {
+          console.log('Adding ICE candidate from professor');
           await peer.connection.addIceCandidate(new RTCIceCandidate(signal.data));
+        } else {
+          console.warn('Received ICE candidate before remote description is set');
         }
         break;
     }
@@ -381,4 +405,4 @@ const handleProfessorSignal = async (
   } catch (error) {
     console.error('Error handling professor signal:', error);
   }
-}; 
+};

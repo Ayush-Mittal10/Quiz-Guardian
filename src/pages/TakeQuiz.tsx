@@ -137,7 +137,11 @@ const TakeQuiz = () => {
       if (!quiz?.settings.monitoringEnabled) return;
       
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        // Request camera and microphone access
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true,
+          audio: quiz.settings.monitoringEnabled // Enable audio if monitoring is enabled
+        });
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -170,7 +174,7 @@ const TakeQuiz = () => {
             }
             
             // Initialize WebRTC for real-time monitoring
-            if (user && quiz.id && stream) {
+            if (user && quiz.id && stream && attemptId) {
               console.log('Initializing WebRTC for student monitoring');
               setStreamStatus('connecting');
               
@@ -184,6 +188,20 @@ const TakeQuiz = () => {
                     setStreamStatus(status === 'connected' ? 'active' : 
                                    status === 'connecting' ? 'connecting' : 
                                    status === 'error' ? 'error' : 'inactive');
+                                   
+                    // If status is 'connected', update monitoring_available to true
+                    if (status === 'connected' && attemptId) {
+                      supabase.from('quiz_attempts')
+                        .update({ monitoring_available: true })
+                        .eq('id', attemptId)
+                        .then(({ error }) => {
+                          if (error) {
+                            console.error('Error updating monitoring_available:', error);
+                          } else {
+                            console.log('Successfully updated monitoring_available to true');
+                          }
+                        });
+                    }
                   }
                 );
                 
@@ -203,7 +221,8 @@ const TakeQuiz = () => {
       }
     };
     
-    if (quiz) {
+    // Only start camera and WebRTC when we have an attemptId
+    if (quiz && attemptId) {
       startCamera();
     }
     
@@ -221,9 +240,21 @@ const TakeQuiz = () => {
         console.log('Cleaning up WebRTC connections');
         webRTCCleanupRef.current();
         webRTCCleanupRef.current = null;
+        
+        // Make sure monitoring_available is set to false on cleanup
+        if (attemptId) {
+          supabase.from('quiz_attempts')
+            .update({ monitoring_available: false })
+            .eq('id', attemptId)
+            .then(({ error }) => {
+              if (error) {
+                console.error('Error updating monitoring_available on cleanup:', error);
+              }
+            });
+        }
       }
     };
-  }, [quiz, user]);
+  }, [quiz, attemptId, user]);
   
   // Update last activity timestamp on user interaction
   useEffect(() => {
