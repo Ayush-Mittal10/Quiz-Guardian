@@ -11,6 +11,7 @@ import { saveQuizAttempt, createInitialAttempt, updateQuizAttemptAnswers } from 
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { initFaceDetection, startFaceMonitoring } from '@/utils/faceDetectionUtils';
+import { initStudentWebRTC } from '@/utils/webRTCUtils';
 
 const TakeQuiz = () => {
   const { testId } = useParams<{ testId: string }>();
@@ -31,6 +32,8 @@ const TakeQuiz = () => {
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [facesDetected, setFacesDetected] = useState<number>(0);
   const videoCheckInterval = useRef<number | null>(null);
+  const [streamStatus, setStreamStatus] = useState<'inactive' | 'connecting' | 'active' | 'error'>('inactive');
+  const webRTCCleanupRef = useRef<(() => void) | null>(null);
   
   useEffect(() => {
     if (quiz && !quiz.isActive) {
@@ -165,6 +168,33 @@ const TakeQuiz = () => {
               console.error('Failed to load face detection models');
               addWarning('no-face', 'Face detection initialization failed');
             }
+            
+            // Initialize WebRTC for real-time monitoring
+            if (user && quiz.id && stream) {
+              console.log('Initializing WebRTC for student monitoring');
+              setStreamStatus('connecting');
+              
+              try {
+                const cleanup = await initStudentWebRTC(
+                  quiz.id,
+                  user.id,
+                  stream,
+                  (status) => {
+                    console.log('WebRTC status change:', status);
+                    setStreamStatus(status === 'connected' ? 'active' : 
+                                   status === 'connecting' ? 'connecting' : 
+                                   status === 'error' ? 'error' : 'inactive');
+                  }
+                );
+                
+                webRTCCleanupRef.current = cleanup;
+                
+                console.log('WebRTC initialized successfully');
+              } catch (err) {
+                console.error('Error initializing WebRTC:', err);
+                setStreamStatus('error');
+              }
+            }
           }
         }
       } catch (error) {
@@ -185,8 +215,15 @@ const TakeQuiz = () => {
       if (monitoringInterval) {
         clearInterval(monitoringInterval);
       }
+      
+      // Clean up WebRTC
+      if (webRTCCleanupRef.current) {
+        console.log('Cleaning up WebRTC connections');
+        webRTCCleanupRef.current();
+        webRTCCleanupRef.current = null;
+      }
     };
-  }, [quiz]);
+  }, [quiz, user]);
   
   // Update last activity timestamp on user interaction
   useEffect(() => {
@@ -291,12 +328,27 @@ const TakeQuiz = () => {
             .then(({ data, error }) => {
               if (error) {
                 console.error("Error updating warnings:", error);
+                toast({
+                  title: "Warning Not Recorded",
+                  description: "There was an error recording the warning",
+                  variant: "destructive",
+                });
               } else {
                 console.log("Warning added and saved to database:", data);
+                toast({
+                  title: "Integrity Warning",
+                  description: description,
+                  variant: "destructive",
+                });
               }
             });
         } catch (error) {
           console.error("Error updating warnings:", error);
+          toast({
+            title: "Warning Not Recorded",
+            description: "There was an error recording the warning",
+            variant: "destructive",
+          });
         }
       }
       
@@ -476,6 +528,16 @@ const TakeQuiz = () => {
             <div className="text-sm">
               Warnings: {warnings.length}/{quiz?.settings.allowedWarnings || 3}
             </div>
+            {streamStatus === 'active' && (
+              <div className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                Monitoring Active
+              </div>
+            )}
+            {streamStatus === 'connecting' && (
+              <div className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">
+                Connecting...
+              </div>
+            )}
           </div>
         </div>
       </header>

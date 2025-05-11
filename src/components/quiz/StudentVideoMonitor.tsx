@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { AlertTriangle, Mic, MicOff, Video, VideoOff, RefreshCw } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { initFaceDetection, startFaceMonitoring, FaceDetectionResult, detectFaces } from '@/utils/faceDetectionUtils';
+import { monitorStudent, stopMonitoringStudent } from '@/utils/webRTCUtils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface StudentVideoMonitorProps {
   studentId: string | null;
+  quizId?: string;
 }
 
-export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studentId }) => {
-  const [videoFeed, setVideoFeed] = useState<string | null>(null);
+export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studentId, quizId }) => {
+  const { user } = useAuth();
+  const [videoFeed, setVideoFeed] = useState<'active' | 'connecting' | 'error' | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnectionError, setIsConnectionError] = useState(false);
@@ -21,64 +25,86 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   const videoRef = useRef<HTMLVideoElement>(null);
   const detectionInterval = useRef<number | null>(null);
   
-  // For demo purposes, we'll get a stream from the local camera to represent the remote student
+  // Set up WebRTC connection to receive student's camera feed
   useEffect(() => {
-    if (!studentId) {
+    if (!studentId || !quizId || !user) {
       setVideoFeed(null);
       return;
     }
     
-    const connectVideoFeed = async () => {
+    const connectToStudent = async () => {
       setIsLoading(true);
       setIsConnectionError(false);
+      setVideoFeed('connecting');
       
       try {
-        // In a real implementation, we would use WebRTC or similar technology to get the student's camera feed
-        // Here we'll use the local camera for demonstration purposes
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const constraints = {
-            video: true,
-            audio: isAudioEnabled,
-          };
+        // Check if student has monitoring available
+        const { data, error } = await supabase
+          .from('quiz_attempts')
+          .select('monitoring_available')
+          .eq('quiz_id', quizId)
+          .eq('student_id', studentId)
+          .single();
           
-          const stream = await navigator.mediaDevices.getUserMedia(constraints);
-          
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.muted = !isAudioEnabled; // Mute if audio not enabled
-          }
-          
-          setVideoFeed('active');
-          
-          // Initialize face detection models and start monitoring
-          const modelsLoaded = await initFaceDetection();
-          if (modelsLoaded) {
-            // Wait a moment for the video to initialize
-            setTimeout(() => {
-              startRealFaceDetection();
-            }, 2000);
-          } else {
-            console.error('Failed to load face detection models');
-            setIsConnectionError(true);
-          }
-        } else {
-          console.error('Media devices not available');
+        if (error || !data || !data.monitoring_available) {
+          console.error('Student monitoring not available:', error || 'Not enabled');
           setIsConnectionError(true);
-          setVideoFeed('/placeholder.svg'); // Fallback to placeholder
+          setVideoFeed(null);
+          setIsLoading(false);
+          return;
         }
+        
+        // Initiate WebRTC connection to student
+        const success = await monitorStudent(
+          quizId,
+          user.id,
+          studentId
+        );
+        
+        if (!success) {
+          setIsConnectionError(true);
+          setVideoFeed(null);
+        }
+        
+        // The actual stream will be attached by the WebRTC callback in the hook
+        console.log('WebRTC connection initiated');
       } catch (err) {
-        console.error('Error accessing media devices:', err);
+        console.error('Error connecting to student feed:', err);
         setIsConnectionError(true);
-        setVideoFeed('/placeholder.svg'); // Fallback to placeholder
+        setVideoFeed(null);
       } finally {
         setIsLoading(false);
       }
     };
     
-    connectVideoFeed();
+    // Set up stream handling
+    const handleStream = (event: MessageEvent) => {
+      try {
+        const { type, studentId: streamStudentId, stream } = JSON.parse(event.data);
+        
+        if (type === 'student-stream' && streamStudentId === studentId && videoRef.current) {
+          console.log('Received student stream via WebRTC');
+          videoRef.current.srcObject = stream;
+          setVideoFeed('active');
+          setIsConnectionError(false);
+          
+          // Initialize face detection
+          startRealFaceDetection();
+        }
+      } catch (error) {
+        console.error('Error handling stream message:', error);
+      }
+    };
+    
+    // Listen for stream messages from WebRTC util
+    window.addEventListener('message', handleStream);
+    
+    connectToStudent();
     
     return () => {
-      // Clean up video stream when component unmounts or student changes
+      window.removeEventListener('message', handleStream);
+      
+      // Clean up video stream
       if (videoRef.current && videoRef.current.srcObject) {
         const mediaStream = videoRef.current.srcObject as MediaStream;
         mediaStream.getTracks().forEach(track => track.stop());
@@ -89,8 +115,13 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
       if (detectionInterval.current) {
         clearInterval(detectionInterval.current);
       }
+      
+      // Stop monitoring this student
+      if (studentId) {
+        stopMonitoringStudent(studentId);
+      }
     };
-  }, [studentId]);
+  }, [studentId, quizId, user]);
   
   // Real face detection using face-api.js
   const startRealFaceDetection = () => {
@@ -112,9 +143,6 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         setFaceDetected(result.faceCount > 0);
         setMultipleFaces(result.faceCount > 1);
         setLookingAway(result.isLookingAway);
-        
-        // In a real implementation, this data would be sent to the server
-        // console.log('Face detection result:', result);
       } catch (error) {
         console.error('Error in face detection:', error);
       }
@@ -140,14 +168,36 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   };
   
   const retryConnection = () => {
-    if (studentId) {
-      setVideoFeed(null); // Reset state to trigger reconnection
+    if (studentId && quizId && user) {
+      // Reset state to trigger reconnection
+      setVideoFeed(null);
+      
+      // Reconnect with slight delay to ensure clean state
+      setTimeout(() => {
+        if (videoRef.current && videoRef.current.srcObject) {
+          const mediaStream = videoRef.current.srcObject as MediaStream;
+          mediaStream.getTracks().forEach(track => track.stop());
+          videoRef.current.srcObject = null;
+        }
+        
+        // Retry monitoring this student
+        monitorStudent(quizId, user.id, studentId)
+          .then(success => {
+            if (!success) {
+              setIsConnectionError(true);
+            }
+          })
+          .catch(err => {
+            console.error('Error retrying connection:', err);
+            setIsConnectionError(true);
+          });
+      }, 500);
     }
   };
   
   return (
     <div className="space-y-4">
-      <h3 className="font-medium mb-2">Video Feed</h3>
+      <h3 className="font-medium mb-2">Live Video Feed</h3>
       <div className="rounded-md overflow-hidden bg-black mb-2 aspect-video relative">
         {videoFeed === 'active' ? (
           <>
@@ -193,25 +243,29 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
               </div>
             )}
           </>
-        ) : videoFeed ? (
-          <div className="h-full flex flex-col items-center justify-center">
-            <img 
-              src={videoFeed} 
-              alt="Student video feed" 
-              className="w-full h-full object-cover"
-            />
-            {isConnectionError && (
-              <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
+        ) : videoFeed === 'connecting' || isLoading ? (
+          <div className="h-full flex items-center justify-center bg-black">
+            <div className="flex flex-col items-center">
+              <RefreshCw className="h-8 w-8 text-white animate-spin mb-2" />
+              <p className="text-white text-sm">Connecting to student's webcam...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center bg-black">
+            {isConnectionError ? (
+              <div className="flex flex-col items-center justify-center text-center p-4">
+                <AlertTriangle className="h-8 w-8 text-red-500 mb-2" />
                 <p className="text-white mb-2">Connection error</p>
+                <p className="text-gray-400 text-xs mb-4">Student's camera may not be available or connection was lost</p>
                 <Button variant="outline" size="sm" onClick={retryConnection}>
                   Retry connection
                 </Button>
               </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-white">
+                {!studentId ? 'Select a student to view video' : 'Student camera not available'}
+              </div>
             )}
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-full text-white">
-            {isLoading ? 'Loading video...' : 'Select a student to view video'}
           </div>
         )}
       </div>
@@ -228,6 +282,12 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
             {isAudioEnabled ? 'Audio enabled' : 'Audio disabled'}
           </label>
         </div>
+        {videoFeed === 'active' && (
+          <Button variant="outline" size="sm" onClick={retryConnection}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Refresh
+          </Button>
+        )}
       </div>
     </div>
   );

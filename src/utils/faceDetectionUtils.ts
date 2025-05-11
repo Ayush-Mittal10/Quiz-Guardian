@@ -97,7 +97,11 @@ export const detectFaces = async (
         };
 
         // Determine if looking away (based on head pose)
-        result.isLookingAway = Math.abs(yaw) > 30 || Math.abs(pitch) > 20;
+        // Increased thresholds to be less strict on what constitutes "looking away"
+        result.isLookingAway = Math.abs(yaw) > 45 || Math.abs(pitch) > 30;
+        
+        // Log head pose values for debugging
+        console.log(`Head pose - yaw: ${yaw.toFixed(2)}, pitch: ${pitch.toFixed(2)}, looking away: ${result.isLookingAway}`);
       }
 
       // This would require additional object detection models
@@ -172,6 +176,7 @@ export const startFaceMonitoring = (
   lastActivity: number,
   onViolation: (type: 'no-face' | 'multiple-faces' | 'focus-loss', description: string) => void
 ): number => {
+  console.log(`Starting face monitoring with interval: ${intervalMs}ms`);
   // Return the interval ID so it can be cleared later
   return window.setInterval(async () => {
     try {
@@ -179,6 +184,8 @@ export const startFaceMonitoring = (
       const analysis = analyzeFaceDetection(detectionResult, lastActivity);
       
       if (analysis.hasViolation && analysis.warningType) {
+        console.log(`Violation detected: ${analysis.warningType} - ${analysis.description}`);
+        console.log(`Calling onViolation callback...`);
         onViolation(analysis.warningType, analysis.description);
       }
     } catch (error) {

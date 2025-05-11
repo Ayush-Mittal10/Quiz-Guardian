@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,8 @@ import { useQuizMonitoring } from '@/hooks/useQuizMonitoring';
 import { StudentVideoMonitor } from '@/components/quiz/StudentVideoMonitor';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCcw, Webcam } from 'lucide-react';
+import { initProfessorWebRTC } from '@/utils/webRTCUtils';
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +27,8 @@ const MonitorQuiz = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [studentStreams, setStudentStreams] = useState<Record<string, MediaStream>>({});
+  const webRTCCleanupRef = useRef<(() => void) | null>(null);
   
   const {
     loading,
@@ -38,6 +40,73 @@ const MonitorQuiz = () => {
     endQuizForAll,
     refreshData
   } = useQuizMonitoring(quizId);
+
+  // Initialize WebRTC connections to receive student video streams
+  useEffect(() => {
+    if (!quizId || !user) return;
+    
+    const initializeWebRTC = async () => {
+      try {
+        console.log('Initializing WebRTC for professor monitoring');
+        
+        // Initialize WebRTC connections for all students
+        const cleanup = await initProfessorWebRTC(
+          quizId,
+          user.id,
+          (studentId, stream) => {
+            console.log(`Received stream from student ${studentId}`);
+            // Update the streams record when a new stream is received
+            setStudentStreams(prev => ({
+              ...prev,
+              [studentId]: stream
+            }));
+            
+            // Post message to notify components of new stream
+            window.postMessage(
+              JSON.stringify({
+                type: 'student-stream',
+                studentId,
+                stream
+              }),
+              window.location.origin
+            );
+            
+            // Show toast notification
+            toast({
+              title: "Student Connected",
+              description: `Live video feed now available`,
+              duration: 3000,
+            });
+          },
+          (studentId) => {
+            console.log(`Stream removed for student ${studentId}`);
+            // Remove the stream when connection is lost
+            setStudentStreams(prev => {
+              const newStreams = { ...prev };
+              delete newStreams[studentId];
+              return newStreams;
+            });
+          }
+        );
+        
+        webRTCCleanupRef.current = cleanup;
+        
+      } catch (error) {
+        console.error('Error initializing WebRTC for monitoring:', error);
+      }
+    };
+    
+    initializeWebRTC();
+    
+    return () => {
+      // Clean up WebRTC connections
+      if (webRTCCleanupRef.current) {
+        console.log('Cleaning up WebRTC connections');
+        webRTCCleanupRef.current();
+        webRTCCleanupRef.current = null;
+      }
+    };
+  }, [quizId, user, toast]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -181,8 +250,17 @@ const MonitorQuiz = () => {
                               onClick={() => handleStudentClick(student.id)}
                             >
                               <TableCell>
-                                <div>{student.name}</div>
-                                <div className="text-xs text-muted-foreground">{student.email}</div>
+                                <div className="flex items-center">
+                                  <div>
+                                    <div>{student.name}</div>
+                                    <div className="text-xs text-muted-foreground">{student.email}</div>
+                                  </div>
+                                  {studentStreams[student.id] && (
+                                    <div className="ml-2 bg-green-100 p-1 rounded-full">
+                                      <Webcam className="h-3 w-3 text-green-600" />
+                                    </div>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <div className="w-full bg-gray-200 rounded-full h-2.5">
@@ -250,7 +328,10 @@ const MonitorQuiz = () => {
                   <CardContent>
                     {selectedStudent ? (
                       <div className="space-y-4">
-                        <StudentVideoMonitor studentId={selectedStudent} />
+                        <StudentVideoMonitor 
+                          studentId={selectedStudent} 
+                          quizId={quizId} 
+                        />
 
                         <div>
                           <h3 className="font-medium mb-2">Warning Logs</h3>
