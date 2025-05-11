@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { initFaceDetection, startFaceMonitoring, FaceDetectionResult, detectFaces } from '@/utils/faceDetectionUtils';
 import { monitorStudent, stopMonitoringStudent } from '@/utils/webRTCUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { QuizAttemptRow } from '@/types/database';
 
 interface StudentVideoMonitorProps {
   studentId: string | null;
@@ -42,7 +43,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         // Check if student has monitoring available
         const { data, error } = await supabase
           .from('quiz_attempts')
-          .select('monitoring_available')
+          .select('*')
           .eq('quiz_id', quizId)
           .eq('student_id', studentId)
           .single();

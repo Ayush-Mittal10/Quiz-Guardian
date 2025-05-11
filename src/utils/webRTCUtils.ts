@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { QuizAttemptUpdate } from '@/types/database';
 
 // Constants
 const ICE_SERVERS = {
@@ -49,7 +50,7 @@ export const initStudentWebRTC = async (
     onStatusChange?.('connecting');
     
     // Add the signaling channel subscription
-    const { data: signalChannel, error } = await supabase
+    const signalChannel = supabase
       .channel(`quiz:${quizId}`)
       .on('broadcast', { event: 'webrtc-signal' }, async (payload) => {
         const signal = payload.payload as SignalingMessage;
@@ -67,8 +68,8 @@ export const initStudentWebRTC = async (
       })
       .subscribe();
       
-    if (error) {
-      console.error('Error subscribing to signaling channel:', error);
+    if (!signalChannel) {
+      console.error('Error subscribing to signaling channel');
       onStatusChange?.('error');
       return () => {};
     }
@@ -77,8 +78,10 @@ export const initStudentWebRTC = async (
     
     // Notify that student is available (broadcasting presence)
     try {
+      const updateData: QuizAttemptUpdate = { monitoring_available: true };
+      
       const { error: updateError } = await supabase.from('quiz_attempts')
-        .update({ monitoring_available: true })
+        .update(updateData)
         .eq('quiz_id', quizId)
         .eq('student_id', studentId);
         
@@ -105,14 +108,15 @@ export const initStudentWebRTC = async (
       
       // Unsubscribe from channels
       subscriptions.forEach(subscription => {
-        if (subscription && subscription.unsubscribe) {
+        if (subscription && typeof subscription.unsubscribe === 'function') {
           subscription.unsubscribe();
         }
       });
       
       // Update database with monitoring no longer available
+      const updateData: QuizAttemptUpdate = { monitoring_available: false };
       supabase.from('quiz_attempts')
-        .update({ monitoring_available: false })
+        .update(updateData)
         .eq('quiz_id', quizId)
         .eq('student_id', studentId)
         .then(() => console.log('Marked monitoring as unavailable'));
@@ -138,7 +142,7 @@ export const initProfessorWebRTC = async (
   
   try {
     // Subscribe to the signaling channel
-    const { data: signalChannel, error } = await supabase
+    const signalChannel = supabase
       .channel(`quiz:${quizId}`)
       .on('broadcast', { event: 'webrtc-signal' }, async (payload) => {
         const signal = payload.payload as SignalingMessage;
@@ -150,8 +154,8 @@ export const initProfessorWebRTC = async (
       })
       .subscribe();
       
-    if (error) {
-      console.error('Error subscribing to signaling channel:', error);
+    if (!signalChannel) {
+      console.error('Error subscribing to signaling channel');
       return () => {};
     }
     
@@ -170,7 +174,7 @@ export const initProfessorWebRTC = async (
       
       // Unsubscribe from channels
       subscriptions.forEach(subscription => {
-        if (subscription && subscription.unsubscribe) {
+        if (subscription && typeof subscription.unsubscribe === 'function') {
           subscription.unsubscribe();
         }
       });

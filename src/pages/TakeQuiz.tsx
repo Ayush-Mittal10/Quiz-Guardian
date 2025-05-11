@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { initFaceDetection, startFaceMonitoring } from '@/utils/faceDetectionUtils';
 import { initStudentWebRTC } from '@/utils/webRTCUtils';
+import { QuizAttemptUpdate } from '@/types/database';
 
 const TakeQuiz = () => {
   const { testId } = useParams<{ testId: string }>();
@@ -191,8 +192,9 @@ const TakeQuiz = () => {
                                    
                     // If status is 'connected', update monitoring_available to true
                     if (status === 'connected' && attemptId) {
+                      const updateData: QuizAttemptUpdate = { monitoring_available: true };
                       supabase.from('quiz_attempts')
-                        .update({ monitoring_available: true })
+                        .update(updateData)
                         .eq('id', attemptId)
                         .then(({ error }) => {
                           if (error) {
@@ -243,8 +245,9 @@ const TakeQuiz = () => {
         
         // Make sure monitoring_available is set to false on cleanup
         if (attemptId) {
+          const updateData: QuizAttemptUpdate = { monitoring_available: false };
           supabase.from('quiz_attempts')
-            .update({ monitoring_available: false })
+            .update(updateData)
             .eq('id', attemptId)
             .then(({ error }) => {
               if (error) {
