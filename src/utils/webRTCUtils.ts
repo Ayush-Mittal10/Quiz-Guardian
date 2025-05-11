@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { QuizAttemptUpdate, QuizAttemptRow } from '@/types/database';
 
@@ -44,7 +45,7 @@ const clearStaleConnections = () => {
       peerConnections.delete(connectionId);
       
       if (connectionTimeouts.has(connectionId)) {
-        clearTimeout(connectionTimeouts.get(connectionId));
+        clearTimeout(connectionTimeouts.get(connectionId) as unknown as NodeJS.Timeout);
         connectionTimeouts.delete(connectionId);
       }
     }
@@ -132,7 +133,7 @@ export const initStudentWebRTC = async (
       onStatusChange?.('error');
     }
     
-    // Return cleanup function
+    // Return cleanup function that properly handles async operations
     return () => {
       // Clean up local stream
       localStream.getTracks().forEach(track => track.stop());
@@ -153,12 +154,12 @@ export const initStudentWebRTC = async (
       
       // Update database with monitoring no longer available
       const updateData: QuizAttemptUpdate = { monitoring_available: false };
-      await supabase.from('quiz_attempts')
+      supabase.from('quiz_attempts')
         .update(updateData)
         .eq('quiz_id', quizId)
         .eq('student_id', studentId)
         .then(() => console.log('Marked monitoring as unavailable'))
-        .catch(err => console.error('Failed to mark monitoring as unavailable:', err));
+        .catch(error => console.error('Failed to mark monitoring as unavailable:', error));
     };
   } catch (error) {
     console.error('Error in WebRTC initialization:', error);
