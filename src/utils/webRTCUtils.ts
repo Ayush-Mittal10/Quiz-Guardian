@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { QuizAttemptUpdate, QuizAttemptRow } from '@/types/database';
 
@@ -154,13 +153,18 @@ export const initStudentWebRTC = async (
       
       // Update database with monitoring no longer available
       const updateData: QuizAttemptUpdate = { monitoring_available: false };
-      // Fix: Use a Promise chain with proper typing
+      // Fix: Use a Promise chain with correct typing for Supabase response
       void supabase.from('quiz_attempts')
         .update(updateData)
         .eq('quiz_id', quizId)
         .eq('student_id', studentId)
-        .then(() => console.log('Marked monitoring as unavailable'))
-        .catch((error: any) => console.error('Failed to mark monitoring as unavailable:', error));
+        .then(({ error }) => {
+          if (error) {
+            console.error('Failed to mark monitoring as unavailable:', error);
+          } else {
+            console.log('Marked monitoring as unavailable');
+          }
+        });
     };
   } catch (error) {
     console.error('Error in WebRTC initialization:', error);
