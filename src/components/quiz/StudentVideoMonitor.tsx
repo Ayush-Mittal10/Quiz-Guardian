@@ -67,6 +67,8 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
           return;
         }
         
+        console.log(`Attempting to monitor student ${studentId} for quiz ${quizId}`);
+        
         // Initiate WebRTC connection to student
         const success = await monitorStudent(
           quizId,
@@ -75,12 +77,12 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         );
         
         if (!success) {
+          console.error('Failed to establish WebRTC connection with student');
           setIsConnectionError(true);
           setVideoFeed(null);
+        } else {
+          console.log('Successfully initiated monitoring request');
         }
-        
-        // The actual stream will be attached by the WebRTC callback in the hook
-        console.log('WebRTC connection initiated');
       } catch (err) {
         console.error('Error connecting to student feed:', err);
         setIsConnectionError(true);
@@ -93,12 +95,21 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
     // Set up stream handling
     const handleStream = (event: MessageEvent) => {
       try {
+        if (typeof event.data !== 'string') return;
+        
         const parsedData = JSON.parse(event.data);
         const { type, studentId: streamStudentId, stream } = parsedData;
+        
+        console.log('Received message event:', type, streamStudentId);
         
         if (type === 'student-stream' && streamStudentId === studentId && videoRef.current) {
           console.log('Received student stream via WebRTC');
           videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().catch(err => {
+              console.error('Error playing video:', err);
+            });
+          };
           setVideoFeed('active');
           setIsConnectionError(false);
           
@@ -186,22 +197,32 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   
   const retryConnection = () => {
     if (studentId && quizId && user) {
+      console.log(`Retrying connection to student ${studentId}`);
+      
       // Reset state to trigger reconnection
       setVideoFeed(null);
+      setIsConnectionError(false);
+      
+      // Stop any existing monitoring
+      stopMonitoringStudent(studentId);
+      
+      // Clear the video element
+      if (videoRef.current && videoRef.current.srcObject) {
+        const mediaStream = videoRef.current.srcObject as MediaStream;
+        mediaStream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
       
       // Reconnect with slight delay to ensure clean state
       setTimeout(() => {
-        if (videoRef.current && videoRef.current.srcObject) {
-          const mediaStream = videoRef.current.srcObject as MediaStream;
-          mediaStream.getTracks().forEach(track => track.stop());
-          videoRef.current.srcObject = null;
-        }
-        
-        // Retry monitoring this student
         monitorStudent(quizId, user.id, studentId)
           .then(success => {
             if (!success) {
+              console.error('Retry connection failed');
               setIsConnectionError(true);
+            } else {
+              console.log('Retry connection initiated');
+              setVideoFeed('connecting');
             }
           })
           .catch(err => {

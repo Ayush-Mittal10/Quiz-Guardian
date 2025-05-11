@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { QuizAttemptUpdate } from '@/types/database';
 
@@ -141,6 +142,8 @@ export const initProfessorWebRTC = async (
   let subscriptions: any[] = [];
   
   try {
+    console.log('Professor initializing WebRTC for monitoring quiz:', quizId);
+    
     // Subscribe to the signaling channel
     const signalChannel = supabase
       .channel(`quiz:${quizId}`)
@@ -150,6 +153,7 @@ export const initProfessorWebRTC = async (
         // Only process signals intended for this professor
         if (signal.receiver !== professorId) return;
 
+        console.log('Professor received signal:', signal.type, 'from student:', signal.sender);
         await handleProfessorSignal(signal, quizId, professorId, onNewStream);
       })
       .subscribe();
@@ -194,19 +198,48 @@ export const monitorStudent = async (
   studentId: string
 ): Promise<boolean> => {
   try {
+    console.log(`Professor ${professorId} attempting to monitor student ${studentId} for quiz ${quizId}`);
+    
     // Check if we already have a connection to this student
     if (peerConnections.has(studentId)) {
       console.log('Already connected to student:', studentId);
-      return true;
+      
+      // If we have a connection but no stream, close it and try again
+      const existingPeer = peerConnections.get(studentId);
+      if (!remoteVideoStreams.has(studentId)) {
+        console.log('Connection exists but no stream, trying to reconnect');
+        existingPeer?.connection.close();
+        peerConnections.delete(studentId);
+      } else {
+        return true;
+      }
     }
     
     // Create new peer connection for this student
     const peerConnection = new RTCPeerConnection(ICE_SERVERS);
     peerConnections.set(studentId, { connection: peerConnection });
     
+    // Set up event handlers for the connection
+    peerConnection.onconnectionstatechange = () => {
+      console.log(`WebRTC connection state with student ${studentId}:`, peerConnection.connectionState);
+      
+      if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'closed') {
+        console.error('Connection failed or closed, may need to retry');
+      }
+    };
+    
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log(`ICE connection state with student ${studentId}:`, peerConnection.iceConnectionState);
+    };
+    
+    peerConnection.onicecandidateerror = (event) => {
+      console.error('ICE candidate error:', event);
+    };
+    
     // Listen for ICE candidates
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
+        console.log(`Sending ICE candidate to student ${studentId}`);
         sendSignal({
           type: 'ice-candidate',
           sender: professorId,
@@ -218,10 +251,25 @@ export const monitorStudent = async (
       }
     };
     
+    // Listen for tracks
+    peerConnection.ontrack = (event) => {
+      console.log(`Received track from student ${studentId}`);
+      if (event.streams && event.streams[0]) {
+        console.log('Setting remote stream');
+        remoteVideoStreams.set(studentId, event.streams[0]);
+      }
+    };
+    
     // Create and send the offer
-    const offer = await peerConnection.createOffer();
+    console.log(`Creating offer for student ${studentId}`);
+    const offer = await peerConnection.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true
+    });
+    
     await peerConnection.setLocalDescription(offer);
     
+    console.log(`Sending offer to student ${studentId}`);
     sendSignal({
       type: 'offer',
       sender: professorId,
@@ -260,6 +308,7 @@ export const stopMonitoringStudent = (studentId: string): void => {
  */
 const sendSignal = async (signal: SignalingMessage): Promise<void> => {
   try {
+    console.log('Sending signal:', signal.type, 'to:', signal.receiver);
     await supabase
       .channel(`quiz:${signal.quizId}`)
       .send({
@@ -288,9 +337,20 @@ const handleIncomingSignal = async (
     let peer = peerConnections.get(professorId);
     
     if (!peer) {
+      console.log(`Student ${studentId} creating new peer connection for professor ${professorId}`);
       const peerConnection = new RTCPeerConnection(ICE_SERVERS);
       
+      // Set up connection state monitoring
+      peerConnection.onconnectionstatechange = () => {
+        console.log(`Connection state changed to ${peerConnection.connectionState}`);
+      };
+      
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log(`ICE connection state changed to ${peerConnection.iceConnectionState}`);
+      };
+      
       // Add all local tracks to the connection
+      console.log('Student adding local tracks to peer connection');
       localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
       });
@@ -298,6 +358,7 @@ const handleIncomingSignal = async (
       // Listen for ICE candidates
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log('Student sending ICE candidate to professor');
           sendSignal({
             type: 'ice-candidate',
             sender: studentId,
@@ -307,11 +368,6 @@ const handleIncomingSignal = async (
             timestamp: new Date().toISOString()
           });
         }
-      };
-      
-      // Set connection state handling
-      peerConnection.onconnectionstatechange = () => {
-        console.log(`WebRTC connection state: ${peerConnection.connectionState}`);
       };
       
       peer = { connection: peerConnection, stream: localStream };
@@ -326,6 +382,7 @@ const handleIncomingSignal = async (
         const answer = await peer.connection.createAnswer();
         await peer.connection.setLocalDescription(answer);
         
+        console.log('Student sending answer to professor');
         sendSignal({
           type: 'answer',
           sender: studentId,
@@ -338,10 +395,10 @@ const handleIncomingSignal = async (
       
       case 'ice-candidate':
         if (peer.connection.remoteDescription) {
-          console.log('Adding ICE candidate from professor');
+          console.log('Student adding ICE candidate from professor');
           await peer.connection.addIceCandidate(new RTCIceCandidate(signal.data));
         } else {
-          console.warn('Received ICE candidate before remote description is set');
+          console.warn('Received ICE candidate before remote description is set, buffering it for later');
         }
         break;
     }
@@ -366,11 +423,19 @@ const handleProfessorSignal = async (
     let peer = peerConnections.get(studentId);
     
     if (!peer) {
+      console.log(`Professor ${professorId} creating new peer connection for student ${studentId}`);
       const peerConnection = new RTCPeerConnection(ICE_SERVERS);
+      
+      // Set up event handlers for the connection
+      peerConnection.onconnectionstatechange = () => {
+        console.log(`WebRTC connection state with student ${studentId}:`, peerConnection.connectionState);
+      };
       
       // Set up event handlers for remote tracks
       peerConnection.ontrack = (event) => {
+        console.log(`Professor received track from student ${studentId}`);
         if (event.streams && event.streams[0]) {
+          console.log(`Setting up stream from student ${studentId}`);
           remoteVideoStreams.set(studentId, event.streams[0]);
           onNewStream(studentId, event.streams[0]);
         }
@@ -379,6 +444,7 @@ const handleProfessorSignal = async (
       // Listen for ICE candidates
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log(`Professor sending ICE candidate to student ${studentId}`);
           sendSignal({
             type: 'ice-candidate',
             sender: professorId,
@@ -397,12 +463,16 @@ const handleProfessorSignal = async (
     // Handle the specific signal type
     switch (signal.type) {
       case 'answer':
+        console.log(`Professor received answer from student ${studentId}`);
         await peer.connection.setRemoteDescription(new RTCSessionDescription(signal.data));
         break;
       
       case 'ice-candidate':
         if (peer.connection.remoteDescription) {
+          console.log(`Professor adding ICE candidate from student ${studentId}`);
           await peer.connection.addIceCandidate(new RTCIceCandidate(signal.data));
+        } else {
+          console.warn('Received ICE candidate before remote description is set');
         }
         break;
     }
