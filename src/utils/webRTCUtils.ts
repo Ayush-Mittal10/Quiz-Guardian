@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { QuizAttemptUpdate, QuizAttemptRow } from '@/types/database';
 
@@ -154,7 +153,7 @@ export const initStudentWebRTC = async (
       
       // Update database with monitoring no longer available
       const updateData: QuizAttemptUpdate = { monitoring_available: false };
-      supabase.from('quiz_attempts')
+      await supabase.from('quiz_attempts')
         .update(updateData)
         .eq('quiz_id', quizId)
         .eq('student_id', studentId)
@@ -334,7 +333,7 @@ export const monitorStudent = async (
             monitorStudent(quizId, professorId, studentId);
           }, 5000);
           
-          connectionTimeouts.set(studentId, timeoutId);
+          connectionTimeouts.set(studentId, timeoutId as unknown as number);
         }
       }
     };
@@ -390,7 +389,7 @@ export const monitorStudent = async (
       timestamp: new Date().toISOString()
     });
     
-    // Set a timeout to check if connection was established
+    // Set timeout to check if connection was established
     const timeoutId = setTimeout(() => {
       const peer = peerConnections.get(studentId);
       if (peer && (peer.connectionState === undefined || peer.connectionState === 'new')) {
@@ -404,7 +403,7 @@ export const monitorStudent = async (
       }
     }, 15000);
     
-    connectionTimeouts.set(studentId, timeoutId);
+    connectionTimeouts.set(studentId, timeoutId as unknown as number);
     
     return true;
   } catch (error) {
@@ -431,7 +430,7 @@ export const stopMonitoringStudent = (studentId: string): void => {
   
   // Clear any pending timeouts
   if (connectionTimeouts.has(studentId)) {
-    clearTimeout(connectionTimeouts.get(studentId));
+    clearTimeout(connectionTimeouts.get(studentId) as unknown as NodeJS.Timeout);
     connectionTimeouts.delete(studentId);
   }
 };
@@ -652,7 +651,7 @@ const handleProfessorSignal = async (
           
           // Clear any connection timeout since we received an answer
           if (connectionTimeouts.has(studentId)) {
-            clearTimeout(connectionTimeouts.get(studentId));
+            clearTimeout(connectionTimeouts.get(studentId) as unknown as number);
             connectionTimeouts.delete(studentId);
           }
         } catch (error) {

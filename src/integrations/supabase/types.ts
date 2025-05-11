@@ -77,6 +77,7 @@ export type Database = {
           auto_submitted: boolean | null
           created_at: string
           id: string
+          monitoring_available: boolean | null
           quiz_id: string
           score: number | null
           started_at: string
@@ -89,6 +90,7 @@ export type Database = {
           auto_submitted?: boolean | null
           created_at?: string
           id?: string
+          monitoring_available?: boolean | null
           quiz_id: string
           score?: number | null
           started_at?: string
@@ -101,6 +103,7 @@ export type Database = {
           auto_submitted?: boolean | null
           created_at?: string
           id?: string
+          monitoring_available?: boolean | null
           quiz_id?: string
           score?: number | null
           started_at?: string

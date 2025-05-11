@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Mic, MicOff, Video, VideoOff, RefreshCw } from 'lucide-react';
@@ -175,7 +174,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         toast({
           title: "Connection Established",
           description: "Student's webcam feed is now active",
-          variant: "success",
+          variant: "default", // Fix the variant value
         });
         
         // Initialize face detection
