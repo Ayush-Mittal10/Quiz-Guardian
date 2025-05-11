@@ -25,11 +25,35 @@ interface PeerConnection {
   connection: RTCPeerConnection;
   stream?: MediaStream;
   pendingCandidates: RTCIceCandidate[];
+  connectionState?: RTCPeerConnectionState;
+  retryCount: number;
 }
 
 // Connection maps - we store them here so they persist between renders
 const peerConnections = new Map<string, PeerConnection>();
 const remoteVideoStreams = new Map<string, MediaStream>();
+const connectionTimeouts = new Map<string, number>();
+
+// Clear any stale connections that may exist
+const clearStaleConnections = () => {
+  peerConnections.forEach((peer, connectionId) => {
+    if (peer.connection.connectionState === 'failed' || 
+        peer.connection.connectionState === 'closed' ||
+        peer.connection.iceConnectionState === 'disconnected') {
+      console.log(`Clearing stale connection: ${connectionId}`);
+      peer.connection.close();
+      peerConnections.delete(connectionId);
+      
+      if (connectionTimeouts.has(connectionId)) {
+        clearTimeout(connectionTimeouts.get(connectionId));
+        connectionTimeouts.delete(connectionId);
+      }
+    }
+  });
+};
+
+// Periodically clean up stale connections
+setInterval(clearStaleConnections, 30000);
 
 /**
  * Initialize and set up WebRTC for a student taking a quiz
@@ -60,6 +84,8 @@ export const initStudentWebRTC = async (
         // Only process signals intended for this student
         if (signal.receiver !== studentId) return;
         
+        console.log(`Student ${studentId} received signal type: ${signal.type} from ${signal.sender}`);
+        
         // Handle different types of signals
         await handleIncomingSignal(signal, quizId, studentId, localStream);
         
@@ -74,7 +100,9 @@ export const initStudentWebRTC = async (
     
     // Notify that student is available (broadcasting presence)
     try {
-      const updateData: QuizAttemptUpdate = { monitoring_available: true };
+      const updateData: QuizAttemptUpdate = { 
+        monitoring_available: true
+      };
       
       const { error: updateError } = await supabase.from('quiz_attempts')
         .update(updateData)
@@ -83,11 +111,26 @@ export const initStudentWebRTC = async (
         
       if (updateError) {
         console.error('Error updating monitoring availability:', updateError);
+        onStatusChange?.('error');
       } else {
         console.log('Successfully marked monitoring as available');
+        // Double-check that the flag was set correctly
+        const { data: verifyData, error: verifyError } = await supabase
+          .from('quiz_attempts')
+          .select('monitoring_available')
+          .eq('quiz_id', quizId)
+          .eq('student_id', studentId)
+          .single();
+          
+        if (verifyError) {
+          console.error('Error verifying monitoring flag:', verifyError);
+        } else {
+          console.log('Verified monitoring_available flag:', verifyData.monitoring_available);
+        }
       }
     } catch (err) {
       console.error('Error updating monitoring_available flag:', err);
+      onStatusChange?.('error');
     }
     
     // Return cleanup function
@@ -115,7 +158,8 @@ export const initStudentWebRTC = async (
         .update(updateData)
         .eq('quiz_id', quizId)
         .eq('student_id', studentId)
-        .then(() => console.log('Marked monitoring as unavailable'));
+        .then(() => console.log('Marked monitoring as unavailable'))
+        .catch(err => console.error('Failed to mark monitoring as unavailable:', err));
     };
   } catch (error) {
     console.error('Error in WebRTC initialization:', error);
@@ -155,6 +199,15 @@ export const initProfessorWebRTC = async (
       
     subscriptions.push(signalChannel);
     
+    // Clear any existing connections
+    peerConnections.forEach((peer, studentId) => {
+      peer.connection.close();
+      onStreamRemoved(studentId);
+    });
+    
+    peerConnections.clear();
+    remoteVideoStreams.clear();
+    
     // Return cleanup function
     return () => {
       // Close all peer connections
@@ -165,6 +218,12 @@ export const initProfessorWebRTC = async (
       
       peerConnections.clear();
       remoteVideoStreams.clear();
+      
+      // Clear all timeouts
+      connectionTimeouts.forEach((timeoutId) => {
+        clearTimeout(timeoutId);
+      });
+      connectionTimeouts.clear();
       
       // Unsubscribe from channels
       subscriptions.forEach(subscription => {
@@ -221,24 +280,62 @@ export const monitorStudent = async (
     // Use our custom QuizAttemptRow type to properly type the data
     const attemptData = data as QuizAttemptRow;
     
-    if (!attemptData || !attemptData.monitoring_available) {
-      console.error('Student monitoring not enabled for this attempt');
+    if (!attemptData) {
+      console.error('No quiz attempt found for student');
       return false;
+    }
+    
+    if (!attemptData.monitoring_available) {
+      console.error('Student monitoring not enabled for this attempt');
+      
+      // Try to update the monitoring_available flag as it might be a data consistency issue
+      console.log('Attempting to enable monitoring for student');
+      const { error: updateError } = await supabase.from('quiz_attempts')
+        .update({ monitoring_available: true })
+        .eq('quiz_id', quizId)
+        .eq('student_id', studentId);
+        
+      if (updateError) {
+        console.error('Error enabling monitoring:', updateError);
+        return false;
+      }
+      
+      console.log('Successfully enabled monitoring, retrying connection');
     }
     
     // Create new peer connection for this student
     const peerConnection = new RTCPeerConnection(ICE_SERVERS);
     peerConnections.set(studentId, { 
       connection: peerConnection,
-      pendingCandidates: []
+      pendingCandidates: [],
+      retryCount: 0
     });
     
     // Set up event handlers for the connection
     peerConnection.onconnectionstatechange = () => {
       console.log(`WebRTC connection state with student ${studentId}:`, peerConnection.connectionState);
       
+      const peer = peerConnections.get(studentId);
+      if (peer) {
+        peer.connectionState = peerConnection.connectionState;
+      }
+      
       if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'closed') {
         console.error('Connection failed or closed, may need to retry');
+        
+        // Set up a retry if we haven't exceeded the limit
+        const currentPeer = peerConnections.get(studentId);
+        if (currentPeer && currentPeer.retryCount < 3) {
+          currentPeer.retryCount++;
+          
+          // Set up timeout to retry the connection
+          const timeoutId = setTimeout(() => {
+            console.log(`Auto-retrying connection to student ${studentId}, attempt ${currentPeer.retryCount}`);
+            monitorStudent(quizId, professorId, studentId);
+          }, 5000);
+          
+          connectionTimeouts.set(studentId, timeoutId);
+        }
       }
     };
     
@@ -293,6 +390,22 @@ export const monitorStudent = async (
       timestamp: new Date().toISOString()
     });
     
+    // Set a timeout to check if connection was established
+    const timeoutId = setTimeout(() => {
+      const peer = peerConnections.get(studentId);
+      if (peer && (peer.connectionState === undefined || peer.connectionState === 'new')) {
+        console.log(`Connection timeout for student ${studentId}, retrying...`);
+        if (peer.retryCount < 3) {
+          peer.retryCount++;
+          monitorStudent(quizId, professorId, studentId);
+        } else {
+          console.error(`Failed to connect to student ${studentId} after multiple attempts`);
+        }
+      }
+    }, 15000);
+    
+    connectionTimeouts.set(studentId, timeoutId);
+    
     return true;
   } catch (error) {
     console.error('Error monitoring student:', error);
@@ -314,6 +427,12 @@ export const stopMonitoringStudent = (studentId: string): void => {
   if (stream) {
     stream.getTracks().forEach(track => track.stop());
     remoteVideoStreams.delete(studentId);
+  }
+  
+  // Clear any pending timeouts
+  if (connectionTimeouts.has(studentId)) {
+    clearTimeout(connectionTimeouts.get(studentId));
+    connectionTimeouts.delete(studentId);
   }
 };
 
@@ -384,7 +503,12 @@ const handleIncomingSignal = async (
         }
       };
       
-      peer = { connection: peerConnection, stream: localStream, pendingCandidates: [] };
+      peer = { 
+        connection: peerConnection, 
+        stream: localStream, 
+        pendingCandidates: [],
+        retryCount: 0 
+      };
       peerConnections.set(professorId, peer);
     }
     
@@ -392,29 +516,33 @@ const handleIncomingSignal = async (
     switch (signal.type) {
       case 'offer':
         console.log('Received offer from professor, setting remote description');
-        await peer.connection.setRemoteDescription(new RTCSessionDescription(signal.data));
-        
-        // Process any pending ICE candidates
-        if (peer.pendingCandidates.length > 0) {
-          console.log(`Processing ${peer.pendingCandidates.length} pending ICE candidates`);
-          for (const candidate of peer.pendingCandidates) {
-            await peer.connection.addIceCandidate(candidate);
+        try {
+          await peer.connection.setRemoteDescription(new RTCSessionDescription(signal.data));
+          
+          // Process any pending ICE candidates
+          if (peer.pendingCandidates.length > 0) {
+            console.log(`Processing ${peer.pendingCandidates.length} pending ICE candidates`);
+            for (const candidate of peer.pendingCandidates) {
+              await peer.connection.addIceCandidate(candidate);
+            }
+            peer.pendingCandidates = [];
           }
-          peer.pendingCandidates = [];
+          
+          const answer = await peer.connection.createAnswer();
+          await peer.connection.setLocalDescription(answer);
+          
+          console.log('Student sending answer to professor');
+          sendSignal({
+            type: 'answer',
+            sender: studentId,
+            receiver: professorId,
+            quizId,
+            data: answer,
+            timestamp: new Date().toISOString()
+          });
+        } catch (err) {
+          console.error('Error handling offer:', err);
         }
-        
-        const answer = await peer.connection.createAnswer();
-        await peer.connection.setLocalDescription(answer);
-        
-        console.log('Student sending answer to professor');
-        sendSignal({
-          type: 'answer',
-          sender: studentId,
-          receiver: professorId,
-          quizId,
-          data: answer,
-          timestamp: new Date().toISOString()
-        });
         break;
       
       case 'ice-candidate':
@@ -457,6 +585,12 @@ const handleProfessorSignal = async (
       // Set up event handlers for the connection
       peerConnection.onconnectionstatechange = () => {
         console.log(`WebRTC connection state with student ${studentId}:`, peerConnection.connectionState);
+        
+        // Store the connection state
+        const currentPeer = peerConnections.get(studentId);
+        if (currentPeer) {
+          currentPeer.connectionState = peerConnection.connectionState;
+        }
       };
       
       // Set up event handlers for remote tracks
@@ -484,7 +618,11 @@ const handleProfessorSignal = async (
         }
       };
       
-      peer = { connection: peerConnection, pendingCandidates: [] };
+      peer = { 
+        connection: peerConnection, 
+        pendingCandidates: [],
+        retryCount: 0 
+      };
       peerConnections.set(studentId, peer);
     }
     
@@ -510,6 +648,12 @@ const handleProfessorSignal = async (
               await peer.connection.addIceCandidate(candidate);
             }
             peer.pendingCandidates = [];
+          }
+          
+          // Clear any connection timeout since we received an answer
+          if (connectionTimeouts.has(studentId)) {
+            clearTimeout(connectionTimeouts.get(studentId));
+            connectionTimeouts.delete(studentId);
           }
         } catch (error) {
           console.error('Error handling professor signal:', error);

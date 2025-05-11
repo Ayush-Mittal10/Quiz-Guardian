@@ -8,6 +8,7 @@ import { initFaceDetection, startFaceMonitoring, FaceDetectionResult, detectFace
 import { monitorStudent, stopMonitoringStudent } from '@/utils/webRTCUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { QuizAttemptRow } from '@/types/database';
+import { useToast } from '@/components/ui/use-toast';
 
 interface StudentVideoMonitorProps {
   studentId: string | null;
@@ -16,6 +17,7 @@ interface StudentVideoMonitorProps {
 
 export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studentId, quizId }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [videoFeed, setVideoFeed] = useState<'active' | 'connecting' | 'error' | null>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,6 +30,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   const videoRef = useRef<HTMLVideoElement>(null);
   const detectionInterval = useRef<number | null>(null);
   const connectionRetryCount = useRef<number>(0);
+  const connectionTimeoutRef = useRef<number | null>(null);
   
   // Set up WebRTC connection to receive student's camera feed
   useEffect(() => {
@@ -63,13 +66,26 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         // Use our custom QuizAttemptRow type to properly type the data
         const attemptData = data as QuizAttemptRow;
         
+        // If monitoring is not available, try to activate it
         if (!attemptData.monitoring_available) {
-          console.error('Student monitoring not enabled for this attempt');
-          setIsConnectionError(true);
-          setErrorMessage('Student monitoring is not enabled for this attempt');
-          setVideoFeed(null);
-          setIsLoading(false);
-          return;
+          console.log('Student monitoring not enabled for this attempt, attempting to enable it');
+          
+          const { error: updateError } = await supabase
+            .from('quiz_attempts')
+            .update({ monitoring_available: true })
+            .eq('quiz_id', quizId)
+            .eq('student_id', studentId);
+            
+          if (updateError) {
+            console.error('Failed to enable monitoring:', updateError);
+            setIsConnectionError(true);
+            setErrorMessage('Failed to enable student monitoring for this attempt');
+            setVideoFeed(null);
+            setIsLoading(false);
+            return;
+          }
+          
+          console.log('Successfully enabled monitoring, proceeding with connection');
         }
         
         console.log(`Attempting to monitor student ${studentId} for quiz ${quizId}`);
@@ -89,6 +105,20 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         } else {
           console.log('Successfully initiated monitoring request');
           connectionRetryCount.current = 0;
+          
+          // Set timeout to check if connection is established
+          if (connectionTimeoutRef.current) {
+            clearTimeout(connectionTimeoutRef.current);
+          }
+          
+          connectionTimeoutRef.current = window.setTimeout(() => {
+            if (videoFeed === 'connecting') {
+              console.log('Connection timeout, setting error state');
+              setIsConnectionError(true);
+              setErrorMessage('Connection timeout. Student may not have granted camera access or is offline.');
+              setVideoFeed(null);
+            }
+          }, 20000); // 20 second timeout
         }
       } catch (err: any) {
         console.error('Error connecting to student feed:', err);
@@ -111,6 +141,12 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         if (type !== 'student-stream' || streamStudentId !== studentId) return;
         
         console.log('Received student stream via WebRTC');
+        
+        // Clear connection timeout
+        if (connectionTimeoutRef.current) {
+          clearTimeout(connectionTimeoutRef.current);
+          connectionTimeoutRef.current = null;
+        }
         
         if (!videoRef.current) {
           console.error('Video element not found');
@@ -135,6 +171,12 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         setVideoFeed('active');
         setIsConnectionError(false);
         setErrorMessage('');
+        
+        toast({
+          title: "Connection Established",
+          description: "Student's webcam feed is now active",
+          variant: "success",
+        });
         
         // Initialize face detection
         startRealFaceDetection();
@@ -163,12 +205,18 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         clearInterval(detectionInterval.current);
       }
       
+      // Clear connection timeout
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
+      
       // Stop monitoring this student
       if (studentId) {
         stopMonitoringStudent(studentId);
       }
     };
-  }, [studentId, quizId, user]);
+  }, [studentId, quizId, user, toast, videoFeed]);
   
   // Real face detection using face-api.js
   const startRealFaceDetection = async () => {
@@ -224,8 +272,13 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
       // Increment retry counter
       connectionRetryCount.current += 1;
       
-      if (connectionRetryCount.current > 3) {
-        setErrorMessage(`Multiple connection attempts failed. Please ensure the student has granted camera permissions.`);
+      if (connectionRetryCount.current > 5) {
+        setErrorMessage(`Multiple connection attempts failed. Please ask the student to refresh their browser or ensure they have granted camera permissions.`);
+        toast({
+          title: "Connection Issue",
+          description: "Too many failed connection attempts. Student may need to refresh their browser.",
+          variant: "destructive",
+        });
         return;
       }
       
@@ -244,6 +297,17 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         videoRef.current.srcObject = null;
       }
       
+      // Clear connection timeout
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
+      
+      toast({
+        title: "Reconnecting",
+        description: "Attempting to reconnect to student's webcam",
+      });
+      
       // Reconnect with slight delay to ensure clean state
       setTimeout(() => {
         monitorStudent(quizId, user.id, studentId)
@@ -252,6 +316,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
               console.error('Retry connection failed');
               setIsConnectionError(true);
               setErrorMessage('Connection retry failed. Please try again later.');
+              setVideoFeed(null);
             } else {
               console.log('Retry connection initiated');
               setVideoFeed('connecting');
@@ -319,6 +384,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
             <div className="flex flex-col items-center">
               <RefreshCw className="h-8 w-8 text-white animate-spin mb-2" />
               <p className="text-white text-sm">Connecting to student's webcam...</p>
+              <p className="text-gray-400 text-xs mt-2">This may take a few moments</p>
             </div>
           </div>
         ) : (
