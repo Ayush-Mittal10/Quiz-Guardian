@@ -426,12 +426,33 @@ export async function deleteQuiz(
   }
 }
 
-// New function to delete a specific quiz attempt
+// Improved function to delete a specific quiz attempt
 export async function deleteQuizAttempt(
   attemptId: string
 ): Promise<{ success: boolean; error?: any }> {
   try {
     console.log('Deleting quiz attempt with ID:', attemptId);
+    
+    // Get the attempt before deleting for logging purposes
+    const { data: attemptToDelete, error: checkError } = await supabase
+      .from('quiz_attempts')
+      .select('id, student_id, quiz_id')
+      .eq('id', attemptId)
+      .single();
+    
+    if (checkError) {
+      if (checkError.code === 'PGRST116') {
+        console.warn('Attempt not found for deletion:', attemptId);
+        return {
+          success: false,
+          error: new Error('Attempt not found')
+        };
+      }
+      console.error('Error checking attempt before deletion:', checkError);
+      throw checkError;
+    }
+    
+    console.log('Found attempt to delete:', attemptToDelete);
     
     // Delete the specified quiz attempt
     const { error } = await supabase
@@ -447,8 +468,26 @@ export async function deleteQuizAttempt(
       };
     }
     
-    console.log('Successfully deleted quiz attempt with ID:', attemptId);
-
+    // Verify deletion
+    const { data: verifyDeletion, error: verifyError } = await supabase
+      .from('quiz_attempts')
+      .select('id')
+      .eq('id', attemptId);
+      
+    if (verifyError) {
+      console.error('Error verifying deletion:', verifyError);
+    } else {
+      if (verifyDeletion && verifyDeletion.length > 0) {
+        console.warn('Attempt still exists after deletion attempt');
+        return {
+          success: false,
+          error: new Error('Failed to delete attempt')
+        };
+      } else {
+        console.log('Successfully verified deletion of quiz attempt with ID:', attemptId);
+      }
+    }
+    
     return {
       success: true
     };

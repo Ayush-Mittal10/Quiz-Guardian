@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { StudentResultsTable } from '@/components/quiz/StudentResultsTable';
 import { StudentDetailsPanel } from '@/components/quiz/StudentDetailsPanel';
 import { File } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { deleteQuizAttempt } from '@/utils/quizUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +18,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
 const Results = () => {
@@ -30,6 +28,7 @@ const Results = () => {
   const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [attemptToDelete, setAttemptToDelete] = useState<{ id: string; studentName: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (loading) {
     return (
@@ -47,45 +46,15 @@ const Results = () => {
     if (!attemptToDelete) return;
     
     try {
-      console.log('Deleting attempt with ID:', attemptToDelete.id);
+      setIsDeleting(true);
+      console.log('Starting deletion process for attempt ID:', attemptToDelete.id);
       
-      // First verify the attempt exists before trying to delete it
-      const { data: attemptExists, error: checkError } = await supabase
-        .from('quiz_attempts')
-        .select('id')
-        .eq('id', attemptToDelete.id)
-        .single();
-        
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "row not found" which is fine
-        console.error('Error checking attempt existence:', checkError);
-        throw checkError;
+      // Use the improved deleteQuizAttempt utility function
+      const result = await deleteQuizAttempt(attemptToDelete.id);
+      
+      if (!result.success) {
+        throw result.error || new Error('Failed to delete attempt');
       }
-      
-      console.log('Attempt exists check:', attemptExists);
-      
-      if (!attemptExists && checkError?.code === 'PGRST116') {
-        console.log('Attempt does not exist in the database');
-        toast({
-          title: "Nothing to delete",
-          description: "This attempt has already been deleted.",
-        });
-        setDeleteDialogOpen(false);
-        setAttemptToDelete(null);
-        return;
-      }
-      
-      // Delete the attempt from the database
-      const { error } = await supabase
-        .from('quiz_attempts')
-        .delete()
-        .eq('id', attemptToDelete.id);
-        
-      if (error) {
-        console.error('Error from Supabase when deleting attempt:', error);
-        throw error;
-      }
-      
-      console.log('Supabase deletion complete - no error returned');
       
       // Show success message
       toast({
@@ -113,6 +82,7 @@ const Results = () => {
       // Close the dialog and reset the attempt to delete
       setDeleteDialogOpen(false);
       setAttemptToDelete(null);
+      setIsDeleting(false);
     }
   };
 
@@ -230,14 +200,15 @@ const Results = () => {
             <AlertDialogCancel onClick={() => {
               setDeleteDialogOpen(false);
               setAttemptToDelete(null);
-            }}>
+            }} disabled={isDeleting}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAttempt}
               className="bg-red-500 hover:bg-red-600"
+              disabled={isDeleting}
             >
-              Delete Attempt
+              {isDeleting ? 'Deleting...' : 'Delete Attempt'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,4 +1,3 @@
-
 // User and authentication types
 export type UserRole = 'professor' | 'student';
 
