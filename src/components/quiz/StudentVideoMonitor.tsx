@@ -48,8 +48,19 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
           .eq('student_id', studentId)
           .single();
           
-        if (error || !data || !data.monitoring_available) {
+        if (error || !data) {
           console.error('Student monitoring not available:', error || 'Not enabled');
+          setIsConnectionError(true);
+          setVideoFeed(null);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Use our custom QuizAttemptRow type to properly type the data
+        const attemptData = data as unknown as QuizAttemptRow;
+        
+        if (!attemptData.monitoring_available) {
+          console.error('Student monitoring not enabled for this attempt');
           setIsConnectionError(true);
           setVideoFeed(null);
           setIsLoading(false);
