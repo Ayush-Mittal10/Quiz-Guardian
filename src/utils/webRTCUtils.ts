@@ -154,12 +154,13 @@ export const initStudentWebRTC = async (
       
       // Update database with monitoring no longer available
       const updateData: QuizAttemptUpdate = { monitoring_available: false };
-      supabase.from('quiz_attempts')
+      // Fix: Use a Promise chain with proper typing
+      void supabase.from('quiz_attempts')
         .update(updateData)
         .eq('quiz_id', quizId)
         .eq('student_id', studentId)
         .then(() => console.log('Marked monitoring as unavailable'))
-        .catch(error => console.error('Failed to mark monitoring as unavailable:', error));
+        .catch((error: any) => console.error('Failed to mark monitoring as unavailable:', error));
     };
   } catch (error) {
     console.error('Error in WebRTC initialization:', error);
