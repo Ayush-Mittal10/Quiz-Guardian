@@ -83,6 +83,7 @@ export type Database = {
           started_at: string
           student_id: string
           submitted_at: string | null
+          updated_at: string | null
           warnings: Json | null
         }
         Insert: {
@@ -96,6 +97,7 @@ export type Database = {
           started_at?: string
           student_id: string
           submitted_at?: string | null
+          updated_at?: string | null
           warnings?: Json | null
         }
         Update: {
@@ -109,6 +111,7 @@ export type Database = {
           started_at?: string
           student_id?: string
           submitted_at?: string | null
+          updated_at?: string | null
           warnings?: Json | null
         }
         Relationships: [
