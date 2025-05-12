@@ -560,7 +560,7 @@ const TakeQuiz = () => {
               Time Left: {formatTime(timeLeft)}
             </div>
             <div className="text-sm">
-              Warnings: {warnings.length}/{quiz?.settings.allowedWarnings || 3}
+              Warnings: {warnings.length}/{quiz?.settings.allowedWarnings}
             </div>
             {streamStatus === 'active' && (
               <div className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Quiz } from '@/types';
 
@@ -21,6 +20,12 @@ export const QuizInfo: React.FC<QuizInfoProps> = ({ quiz }) => {
         <span className="font-medium">Questions:</span>
         <span>{quiz.questions.length}</span>
       </div>
+      {quiz.settings.monitoringEnabled && (
+        <div className="flex justify-between">
+          <span className="font-medium">Warning Limit:</span>
+          <span>{quiz.settings.allowedWarnings} warnings</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -5,9 +5,20 @@ import { QuizAttemptUpdate, QuizAttemptRow } from '@/types/database';
 const ICE_SERVERS = {
   iceServers: [
     {
-      urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'],
+      urls: [
+        'stun:stun1.l.google.com:19302',
+        'stun:stun2.l.google.com:19302',
+        'stun:stun3.l.google.com:19302',
+        'stun:stun4.l.google.com:19302'
+      ],
     },
+    {
+      urls: 'turn:numb.viagenie.ca',
+      credential: 'muazkh',
+      username: 'webrtc@live.com'
+    }
   ],
+  iceCandidatePoolSize: 10,
 };
 
 // Types
@@ -308,8 +319,14 @@ export const monitorStudent = async (
       console.log('Successfully enabled monitoring, retrying connection');
     }
     
-    // Create new peer connection for this student
-    const peerConnection = new RTCPeerConnection(ICE_SERVERS);
+    // Create new peer connection for this student with improved configuration
+    const peerConnection = new RTCPeerConnection({
+      ...ICE_SERVERS,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
+      iceTransportPolicy: 'all'
+    });
+
     peerConnections.set(studentId, { 
       connection: peerConnection,
       pendingCandidates: [],
@@ -333,11 +350,12 @@ export const monitorStudent = async (
         if (currentPeer && currentPeer.retryCount < 3) {
           currentPeer.retryCount++;
           
-          // Set up timeout to retry the connection
+          // Set up timeout to retry the connection with exponential backoff
+          const backoffTime = Math.min(1000 * Math.pow(2, currentPeer.retryCount), 10000);
           const timeoutId = setTimeout(() => {
             console.log(`Auto-retrying connection to student ${studentId}, attempt ${currentPeer.retryCount}`);
             monitorStudent(quizId, professorId, studentId);
-          }, 5000);
+          }, backoffTime);
           
           connectionTimeouts.set(studentId, timeoutId as unknown as number);
         }
@@ -346,47 +364,86 @@ export const monitorStudent = async (
     
     peerConnection.oniceconnectionstatechange = () => {
       console.log(`ICE connection state with student ${studentId}:`, peerConnection.iceConnectionState);
+      
+      // Handle ICE connection failures
+      if (peerConnection.iceConnectionState === 'failed' || 
+          peerConnection.iceConnectionState === 'disconnected') {
+        console.error('ICE connection failed or disconnected');
+        
+        // Attempt to restart ICE
+        peerConnection.restartIce();
+      }
     };
     
     peerConnection.onicecandidateerror = (event) => {
       console.error('ICE candidate error:', event);
-    };
-    
-    // Listen for ICE candidates
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        console.log(`Sending ICE candidate to student ${studentId}`);
-        sendSignal({
-          type: 'ice-candidate',
-          sender: professorId,
-          receiver: studentId,
-          quizId,
-          data: event.candidate,
-          timestamp: new Date().toISOString()
-        });
+      
+      // If we get too many ICE errors, try to restart the connection
+      const peer = peerConnections.get(studentId);
+      if (peer && peer.retryCount < 3) {
+        peer.retryCount++;
+        console.log(`ICE errors detected, retrying connection (attempt ${peer.retryCount})`);
+        monitorStudent(quizId, professorId, studentId);
       }
     };
     
-    // Listen for tracks
+    // Listen for ICE candidates with improved error handling
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log(`Sending ICE candidate to student ${studentId}`);
+        try {
+          sendSignal({
+            type: 'ice-candidate',
+            sender: professorId,
+            receiver: studentId,
+            quizId,
+            data: event.candidate,
+            timestamp: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error('Error sending ICE candidate:', error);
+        }
+      }
+    };
+    
+    // Listen for tracks with improved stream handling
     peerConnection.ontrack = (event) => {
       console.log(`Received track from student ${studentId}`);
       if (event.streams && event.streams[0]) {
         console.log('Setting remote stream');
-        remoteVideoStreams.set(studentId, event.streams[0]);
+        const stream = event.streams[0];
+        
+        // Ensure the stream is valid before setting it
+        if (stream.active) {
+          remoteVideoStreams.set(studentId, stream);
+          
+          // Post message to notify components of new stream
+          window.postMessage(
+            JSON.stringify({
+              type: 'student-stream',
+              studentId,
+              stream
+            }),
+            window.location.origin
+          );
+        } else {
+          console.error('Received inactive stream');
+        }
       }
     };
     
-    // Create and send the offer
+    // Create and send the offer with improved options
     console.log(`Creating offer for student ${studentId}`);
     const offer = await peerConnection.createOffer({
       offerToReceiveAudio: true,
-      offerToReceiveVideo: true
+      offerToReceiveVideo: true,
+      iceRestart: true
     });
     
     await peerConnection.setLocalDescription(offer);
     
-    console.log(`Sending offer to student ${studentId}`);
-    sendSignal({
+    // Send the offer to the student
+    await sendSignal({
       type: 'offer',
       sender: professorId,
       receiver: studentId,
@@ -395,25 +452,9 @@ export const monitorStudent = async (
       timestamp: new Date().toISOString()
     });
     
-    // Set timeout to check if connection was established
-    const timeoutId = setTimeout(() => {
-      const peer = peerConnections.get(studentId);
-      if (peer && (peer.connectionState === undefined || peer.connectionState === 'new')) {
-        console.log(`Connection timeout for student ${studentId}, retrying...`);
-        if (peer.retryCount < 3) {
-          peer.retryCount++;
-          monitorStudent(quizId, professorId, studentId);
-        } else {
-          console.error(`Failed to connect to student ${studentId} after multiple attempts`);
-        }
-      }
-    }, 15000);
-    
-    connectionTimeouts.set(studentId, timeoutId as unknown as number);
-    
     return true;
   } catch (error) {
-    console.error('Error monitoring student:', error);
+    console.error('Error in monitorStudent:', error);
     return false;
   }
 };

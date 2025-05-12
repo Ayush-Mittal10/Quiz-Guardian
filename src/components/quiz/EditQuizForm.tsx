@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,20 @@ import { Quiz, QuizSettings } from '@/types';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { invalidateQuizCache } from '@/hooks/useQuizByTestId';
+import { useToast } from '@/components/ui/use-toast';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+const formSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  description: z.string().optional(),
+  timeLimit: z.number().min(1, 'Time limit must be at least 1 minute'),
+  shuffleQuestions: z.boolean(),
+  showResults: z.boolean(),
+  monitoringEnabled: z.boolean(),
+  allowedWarnings: z.number().min(0, 'Warning limit cannot be negative')
+});
 
 interface EditQuizFormProps {
   quiz: Quiz;
@@ -33,46 +47,60 @@ interface FormValues {
 
 export const EditQuizForm = ({ quiz }: EditQuizFormProps) => {
   const navigate = useNavigate();
-  
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       title: quiz.title,
-      description: quiz.description,
+      description: quiz.description || '',
       timeLimit: quiz.settings.timeLimit,
       shuffleQuestions: quiz.settings.shuffleQuestions,
       showResults: quiz.settings.showResults,
       monitoringEnabled: quiz.settings.monitoringEnabled,
-      allowedWarnings: quiz.settings.allowedWarnings,
-    },
+      allowedWarnings: quiz.settings.allowedWarnings
+    }
   });
 
   const onSubmit = async (data: FormValues) => {
+    setIsSubmitting(true);
     try {
-      const settings: QuizSettings = {
-        timeLimit: data.timeLimit,
-        shuffleQuestions: data.shuffleQuestions,
-        showResults: data.showResults,
-        monitoringEnabled: data.monitoringEnabled,
-        allowedWarnings: data.allowedWarnings,
-      };
-
       const { error } = await supabase
         .from('quizzes')
         .update({
           title: data.title,
           description: data.description,
-          settings: settings as any,
-          updated_at: new Date().toISOString(),
+          settings: {
+            timeLimit: data.timeLimit,
+            shuffleQuestions: data.shuffleQuestions,
+            showResults: data.showResults,
+            monitoringEnabled: data.monitoringEnabled,
+            allowedWarnings: data.allowedWarnings
+          }
         })
         .eq('id', quiz.id);
 
       if (error) throw error;
 
-      toast.success('Quiz updated successfully');
+      // Invalidate the quiz cache to ensure fresh data
+      invalidateQuizCache(quiz.testId);
+
+      toast({
+        title: "Success",
+        description: "Quiz settings updated successfully",
+      });
+
       navigate('/dashboard');
     } catch (error) {
       console.error('Error updating quiz:', error);
-      toast.error('Failed to update quiz');
+      toast({
+        title: "Error",
+        description: "Failed to update quiz settings",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

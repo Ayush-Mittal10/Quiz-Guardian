@@ -30,6 +30,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
   const detectionInterval = useRef<number | null>(null);
   const connectionRetryCount = useRef<number>(0);
   const connectionTimeoutRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   
   // Set up WebRTC connection to receive student's camera feed
   useEffect(() => {
@@ -116,14 +117,30 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
               setIsConnectionError(true);
               setErrorMessage('Connection timeout. Student may not have granted camera access or is offline.');
               setVideoFeed(null);
+              
+              // Show toast notification
+              toast({
+                title: "Connection Failed",
+                description: "Could not establish video connection with student. They may need to refresh their browser.",
+                variant: "destructive",
+                duration: 5000,
+              });
             }
-          }, 20000); // 20 second timeout
+          }, 30000); // 30 second timeout
         }
       } catch (err: any) {
         console.error('Error connecting to student feed:', err);
         setIsConnectionError(true);
         setErrorMessage(err.message || 'Unknown connection error');
         setVideoFeed(null);
+        
+        // Show toast notification
+        toast({
+          title: "Connection Error",
+          description: "Failed to connect to student's video feed. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -160,11 +177,29 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
           return;
         }
         
+        // Store the stream reference
+        streamRef.current = mediaStream;
+        
+        // Set up video element
         videoRef.current.srcObject = mediaStream;
         videoRef.current.onloadedmetadata = () => {
           videoRef.current?.play().catch(err => {
             console.error('Error playing video:', err);
+            toast({
+              title: "Video Playback Error",
+              description: "Failed to play student's video feed. Please try refreshing.",
+              variant: "destructive",
+              duration: 5000,
+            });
           });
+        };
+        
+        // Set up error handling for the video element
+        videoRef.current.onerror = (error) => {
+          console.error('Video element error:', error);
+          setVideoFeed('error');
+          setIsConnectionError(true);
+          setErrorMessage('Error playing video stream');
         };
         
         setVideoFeed('active');
@@ -174,13 +209,20 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         toast({
           title: "Connection Established",
           description: "Student's webcam feed is now active",
-          variant: "default", // Fix the variant value
+          variant: "default",
+          duration: 3000,
         });
         
         // Initialize face detection
         startRealFaceDetection();
       } catch (error) {
         console.error('Error handling stream message:', error);
+        toast({
+          title: "Stream Error",
+          description: "Error processing video stream. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
       }
     };
     
@@ -215,7 +257,7 @@ export const StudentVideoMonitor: React.FC<StudentVideoMonitorProps> = ({ studen
         stopMonitoringStudent(studentId);
       }
     };
-  }, [studentId, quizId, user, toast, videoFeed]);
+  }, [studentId, quizId, user, toast]);
   
   // Real face detection using face-api.js
   const startRealFaceDetection = async () => {

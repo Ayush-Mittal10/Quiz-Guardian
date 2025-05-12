@@ -1,9 +1,10 @@
-
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, QuizQuestion, QuizSettings } from '@/types';
 
 export function useQuizByTestId(testId: string | undefined) {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: ['quiz', testId],
     queryFn: async () => {
@@ -102,5 +103,16 @@ export function useQuizByTestId(testId: string | undefined) {
       return formattedQuiz;
     },
     enabled: !!testId,
+    staleTime: 0, // Consider data stale immediately
+    gcTime: 0, // Don't cache the data
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchOnReconnect: true, // Refetch when network reconnects
   });
 }
+
+// Export a function to manually invalidate the quiz cache
+export const invalidateQuizCache = (testId: string) => {
+  const queryClient = useQueryClient();
+  queryClient.invalidateQueries({ queryKey: ['quiz', testId] });
+};
