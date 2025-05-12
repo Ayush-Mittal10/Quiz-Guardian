@@ -14,6 +14,7 @@ export interface QuizAttemptRow {
   submitted_at?: string | null;
   warnings?: Json | null;
   monitoring_available?: boolean;
+  updated_at?: string | null;  // Added to track when the student was last active
 }
 
 // Helper type for upserts/updates
@@ -29,4 +30,5 @@ export type QuizAttemptUpdate = {
   submitted_at?: string | null;
   warnings?: Json | null;
   monitoring_available?: boolean;
+  updated_at?: string;  // Added to match the above
 };

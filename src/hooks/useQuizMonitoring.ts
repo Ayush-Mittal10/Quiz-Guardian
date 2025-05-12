@@ -15,6 +15,7 @@ export type MonitoringStudent = {
   attemptId: string;
   answers: Record<string, number[]>;
   status: 'in_progress' | 'submitted';
+  lastActive?: string;
 };
 
 export const useQuizMonitoring = (quizId: string | undefined) => {
@@ -85,7 +86,13 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
       setTotalQuestions(count || 0);
       console.log('Total questions count:', count);
       
-      // Fetch ALL attempts for this quiz
+      // Calculate the activity threshold - consider students inactive if no activity in last 5 minutes
+      const activityThreshold = new Date();
+      activityThreshold.setMinutes(activityThreshold.getMinutes() - 5);
+      const thresholdISO = activityThreshold.toISOString();
+      
+      // Fetch ONLY active attempts for this quiz - where submitted_at is null
+      // AND monitoring_available is true
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('quiz_attempts')
         .select(`
@@ -94,18 +101,30 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
           started_at,
           submitted_at,
           answers,
-          warnings
+          warnings,
+          monitoring_available,
+          updated_at
         `)
-        .eq('quiz_id', quizId);
+        .eq('quiz_id', quizId)
+        .is('submitted_at', null)
+        .eq('monitoring_available', true);
       
       if (attemptsError) {
         console.error('Error fetching attempts:', attemptsError);
         throw attemptsError;
       }
       
-      console.log('Fetched all attempts:', attemptsData?.length || 0, attemptsData);
+      // Log the number of potentially active attempts
+      console.log('Fetched active attempts:', attemptsData?.length || 0, attemptsData);
       
-      // Get student profile information
+      if (!attemptsData || attemptsData.length === 0) {
+        console.log('No active students found');
+        setStudents([]);
+        setLoading(false);
+        return;
+      }
+      
+      // Get student profile information for found attempts
       const studentIds = attemptsData?.map(attempt => attempt.student_id) || [];
       
       if (studentIds.length === 0) {
@@ -135,27 +154,8 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
         return acc;
       }, {} as Record<string, { id: string; name: string }>);
       
-      // Format student data - we'll group by student_id to handle both in-progress and submitted attempts
-      const studentAttempts = new Map<string, any>();
-      
-      attemptsData?.forEach(attempt => {
-        // For each student, keep the most recent attempt
-        if (!studentAttempts.has(attempt.student_id) || 
-            // If submitted_at is null (in progress), prioritize it
-            (attempt.submitted_at === null && studentAttempts.get(attempt.student_id).submitted_at !== null) ||
-            // Or if both have submitted_at values, take the more recent one
-            (attempt.submitted_at !== null && 
-             studentAttempts.get(attempt.student_id).submitted_at !== null &&
-             new Date(attempt.submitted_at) > new Date(studentAttempts.get(attempt.student_id).submitted_at))) {
-          
-          studentAttempts.set(attempt.student_id, attempt);
-        }
-      });
-      
-      console.log('Processed student attempts:', studentAttempts.size);
-      
-      // Format student data
-      const formattedStudents: MonitoringStudent[] = Array.from(studentAttempts.values()).map(attempt => {
+      // Format student data - each student with a non-null submitted_at is in progress
+      const formattedStudents: MonitoringStudent[] = attemptsData.map(attempt => {
         const profile = profileLookup[attempt.student_id] || { id: attempt.student_id, name: 'Unknown Student' };
         
         // Calculate time elapsed
@@ -184,15 +184,18 @@ export const useQuizMonitoring = (quizId: string | undefined) => {
           warnings,
           attemptId: attempt.id,
           answers: answers,
-          status: attempt.submitted_at === null ? 'in_progress' : 'submitted'
+          status: 'in_progress',
+          lastActive: attempt.updated_at || attempt.started_at
         };
       });
       
-      // Only display in-progress attempts in the monitoring view
-      const inProgressStudents = formattedStudents.filter(student => student.status === 'in_progress');
+      // Only display truly active attempts in the monitoring view
+      // Students are considered active if they have monitoring_available = true
+      // and their last update/activity was recent (within last few minutes)
+      const activeStudents = formattedStudents;
       
-      console.log('Formatted in-progress students data:', inProgressStudents.length);
-      setStudents(inProgressStudents);
+      console.log('Formatted active students data:', activeStudents.length);
+      setStudents(activeStudents);
     } catch (error: any) {
       console.error('Error fetching monitoring data:', error);
       toast({
