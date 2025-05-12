@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Quiz } from '@/types';
 
@@ -23,7 +24,7 @@ export const QuizInfo: React.FC<QuizInfoProps> = ({ quiz }) => {
       {quiz.settings.monitoringEnabled && (
         <div className="flex justify-between">
           <span className="font-medium">Warning Limit:</span>
-          <span>{quiz.settings.allowedWarnings} warnings</span>
+          <span>{quiz.settings.allowedWarnings || 3} warnings</span>
         </div>
       )}
     </div>

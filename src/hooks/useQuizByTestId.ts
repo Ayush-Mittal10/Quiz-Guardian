@@ -1,3 +1,4 @@
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, QuizQuestion, QuizSettings } from '@/types';
@@ -15,7 +16,16 @@ export function useQuizByTestId(testId: string | undefined) {
       // First, get the quiz details
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
-        .select('*')
+        .select(`
+          id,
+          title,
+          description,
+          settings,
+          created_at,
+          created_by,
+          test_id,
+          is_active
+        `)
         .eq('test_id', testId)
         .single();
 
@@ -100,6 +110,7 @@ export function useQuizByTestId(testId: string | undefined) {
 
       console.log('Formatted quiz:', formattedQuiz);
       console.log('Question count after formatting:', formattedQuiz.questions.length);
+      console.log('Allowed warnings from settings:', formattedQuiz.settings.allowedWarnings);
       return formattedQuiz;
     },
     enabled: !!testId,
