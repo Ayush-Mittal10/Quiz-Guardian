@@ -271,7 +271,7 @@ const Home = () => {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center">
-            <p className="text-gray-300">© {currentYear} Quiz Hub. <span className="font-accent">Let's ace it!</span></p>
+            <p className="text-gray-300">© {currentYear} Quizzly. <span className="font-accent">Let's ace it!</span></p>
           </div>
         </div>
       </footer>

@@ -1,4 +1,4 @@
-# Sincere Quiz Guardian
+# Quizzly: A sincere quiz guardian
 
 A secure and intelligent quiz platform with real-time integrity monitoring for educational institutions.
 
@@ -47,7 +47,7 @@ A secure and intelligent quiz platform with real-time integrity monitoring for e
 1. Clone the repository:
 ```sh
 git clone <repository-url>
-cd sincere-quiz-guardian
+cd quizzly
 ```
 
 2. Install dependencies:
