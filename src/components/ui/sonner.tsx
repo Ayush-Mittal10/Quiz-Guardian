@@ -23,11 +23,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
         style: {
-          // Ensure the toast container is fixed positioned
           position: 'fixed',
           zIndex: 100,
         },
       }}
+      expand={false}
+      closeButton={true}
+      richColors={true}
       {...props}
     />
   )
