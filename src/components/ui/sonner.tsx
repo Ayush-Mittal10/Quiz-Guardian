@@ -1,5 +1,6 @@
+
 import { useTheme } from "next-themes"
-import { Toaster as Sonner, toast } from "sonner"
+import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
@@ -9,7 +10,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      className="toaster group fixed"
+      position="bottom-right"
       toastOptions={{
         classNames: {
           toast:
@@ -20,10 +22,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton:
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
+        style: {
+          // Ensure the toast container is fixed positioned
+          position: 'fixed',
+          zIndex: 100,
+        },
       }}
       {...props}
     />
   )
 }
 
-export { Toaster, toast }
+export { Toaster }
+export { toast } from "sonner"
