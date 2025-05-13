@@ -65,7 +65,7 @@ export function StudentDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-muted">
+                <tr className="bg-theme-gray">
                   <th className="p-2 text-left">Quiz</th>
                   <th className="p-2 text-left">Date</th>
                   <th className="p-2 text-left">Score</th>

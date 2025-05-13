@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { QuizSettings } from '@/types';
 import { AlertTriangle, Camera, Radio, Eye, Users } from 'lucide-react';
@@ -59,7 +58,7 @@ export const MonitoringWarning: React.FC<MonitoringWarningProps> = ({ settings }
       <div className="bg-amber-100 p-3 rounded border border-amber-200">
         <p className="text-sm font-medium text-amber-800">Warning System</p>
         <p className="text-xs text-amber-700 mt-1">
-          After {settings.allowedWarnings} integrity violations, your quiz will be automatically submitted.
+          After {Number(settings.allowedWarnings)} integrity violations, your quiz will be automatically submitted.
           Violations include: switching tabs, losing focus, no face detected, multiple faces in view, or looking away from the screen.
         </p>
       </div>

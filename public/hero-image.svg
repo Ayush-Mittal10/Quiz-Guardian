@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- Yellow Background -->
+  <rect x="0" y="0" width="800" height="600" fill="#FFCF54" />
+  
+  <!-- White Speech Bubble -->
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000000" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+  
+  <!-- Main circle -->
+  <circle cx="400" cy="300" r="200" fill="white" filter="url(#shadow)" />
+  
+  <!-- Arc decorations -->
+  <path d="M210,255 A220,220 0 0,1 335,130" fill="none" stroke="white" stroke-width="8" stroke-linecap="round" />
+  <path d="M590,255 A220,220 0 0,0 465,130" fill="none" stroke="white" stroke-width="8" stroke-linecap="round" />
+  
+  <!-- Quiz Time Text -->
+  <text x="400" y="260" font-family="Arial, sans-serif" font-size="80" font-weight="bold" fill="#333333" text-anchor="middle">Quiz</text>
+  <text x="400" y="350" font-family="Arial, sans-serif" font-size="80" font-weight="bold" fill="#333333" text-anchor="middle">Time</text>
+  
+  <!-- Megaphone -->
+  <g transform="translate(590, 350) rotate(15)">
+    <!-- Megaphone body -->
+    <path d="M0,0 L80,25 L80,-25 L0,0 Z" fill="#4070CC" />
+    <ellipse cx="80" cy="0" rx="10" ry="26" fill="#4070CC" />
+    <rect x="-40" y="-10" width="40" height="20" fill="#4070CC" rx="5" ry="5" />
+    
+    <!-- Handle -->
+    <path d="M-25,10 L-25,30 L-10,30 L-10,15 Z" fill="#4070CC" />
+    
+    <!-- Sound waves / splashes -->
+    <path d="M-50,-30 Q-60,-20 -40,-15" fill="none" stroke="#FFAB42" stroke-width="6" stroke-linecap="round" />
+    <path d="M-65,-10 Q-75,0 -55,5" fill="none" stroke="#FFAB42" stroke-width="8" stroke-linecap="round" />
+    <path d="M-60,15 Q-70,25 -50,30" fill="none" stroke="#FFAB42" stroke-width="7" stroke-linecap="round" />
+    
+    <!-- Small drops -->
+    <ellipse cx="-65" cy="40" rx="8" ry="12" fill="#FFAB42" transform="rotate(-30)" />
+    <ellipse cx="-90" cy="5" rx="7" ry="10" fill="#FFAB42" transform="rotate(-45)" />
+  </g>
+</svg>

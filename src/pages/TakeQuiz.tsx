@@ -387,7 +387,7 @@ const TakeQuiz = () => {
       }
       
       // Auto-submit if warning limit reached
-      if (updatedWarnings.length >= (quiz.settings.allowedWarnings || 3)) {
+      if (updatedWarnings.length >= (Number(quiz.settings.allowedWarnings) || 3)) {
         console.log("Warning limit reached, auto-submitting quiz");
         submitQuiz(true);
       }
@@ -560,7 +560,7 @@ const TakeQuiz = () => {
               Time Left: {formatTime(timeLeft)}
             </div>
             <div className="text-sm">
-              Warnings: {warnings.length}/{quiz?.settings.allowedWarnings}
+              Warnings: {warnings.length}/{Number(quiz?.settings.allowedWarnings)}
             </div>
             {streamStatus === 'active' && (
               <div className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
@@ -674,7 +674,7 @@ const TakeQuiz = () => {
                     {warnings.length > 0 && (
                       <div className="bg-red-50 p-2 rounded-md mb-3">
                         <p className="text-xs font-medium text-red-800">
-                          Warnings: {warnings.length}/{quiz.settings.allowedWarnings}
+                          Warnings: {warnings.length}/{Number(quiz.settings.allowedWarnings)}
                         </p>
                         <p className="text-xs text-red-700">
                           Exceeding limit will auto-submit your quiz
