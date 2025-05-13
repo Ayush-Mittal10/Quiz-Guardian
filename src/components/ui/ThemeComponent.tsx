@@ -1,11 +1,15 @@
+
 import React, { ReactNode } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 
-interface ThemeProps {
+interface BaseProps {
   children: ReactNode;
-  variant?: 'primary' | 'secondary';
   className?: string;
+}
+
+interface ThemeProps extends BaseProps {
+  variant?: 'primary' | 'secondary';
 }
 
 /**
@@ -52,7 +56,7 @@ export const ThemeSection: React.FC<ThemeProps> = ({
 /**
  * Text component that applies theme typography
  */
-interface TextProps extends ThemeProps {
+interface TextProps extends BaseProps {
   variant?: 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'secondary';
   as?: 'h1' | 'h2' | 'h3' | 'h4' | 'p' | 'span' | 'div';
 }
