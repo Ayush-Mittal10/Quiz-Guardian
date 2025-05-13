@@ -1,4 +1,3 @@
-
 import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 
@@ -21,15 +20,21 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton:
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          title: "group-[.toast]:font-semibold",
+          info: "group-[.toast]:bg-background group-[.toast]:text-foreground group-[.toast]:border-border",
+          success: "group-[.toast]:bg-background group-[.toast]:text-foreground group-[.toast]:border-border",
+          warning: "group-[.toast]:bg-background group-[.toast]:text-foreground group-[.toast]:border-border",
+          error: "group-[.toast]:bg-background group-[.toast]:text-foreground group-[.toast]:border-border",
+          loader: "group-[.toast]:text-muted-foreground",
         },
         style: {
           position: 'fixed',
           zIndex: 100,
         },
       }}
-      expand={false}
+      expand={true}
       closeButton={true}
-      richColors={true}
+      richColors={false}
       {...props}
     />
   )
