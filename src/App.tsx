@@ -1,4 +1,3 @@
-
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -20,6 +19,7 @@ import QuizSubmitted from "./pages/QuizSubmitted";
 import Results from "./pages/Results";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
+import About from '@/pages/About';
 
 const queryClient = new QueryClient();
 
@@ -78,6 +78,7 @@ const App = () => (
               } />
               
               <Route path="/unauthorized" element={<Unauthorized />} />
+              <Route path="/about" element={<About />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
