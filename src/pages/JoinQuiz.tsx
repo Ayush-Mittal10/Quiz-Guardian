@@ -103,7 +103,7 @@ const JoinQuiz = () => {
   if (quizError || !quiz) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <QuizHeader title="Academic Quiz Guardian" />
+        <QuizHeader title="Quizzly" />
         <QuizErrorDisplay error={quizError ? quizError.message : "Quiz not found"} />
       </div>
     );
@@ -112,7 +112,7 @@ const JoinQuiz = () => {
   if (hasAttempted) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <QuizHeader title="Academic Quiz Guardian" />
+        <QuizHeader title="Quizzly" />
         <main className="container mx-auto px-4 py-6">
           <div className="max-w-2xl mx-auto">
             <Card>
@@ -150,7 +150,7 @@ const JoinQuiz = () => {
   if (!quiz.isActive) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <QuizHeader title="Academic Quiz Guardian" />
+        <QuizHeader title="Quizzly" />
         <main className="container mx-auto px-4 py-6">
           <div className="max-w-2xl mx-auto">
             <Card>
@@ -186,7 +186,7 @@ const JoinQuiz = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <QuizHeader title="Academic Quiz Guardian" />
+      <QuizHeader title="Quizzly" />
 
       <main className="container mx-auto px-4 py-6">
         <div className="max-w-2xl mx-auto">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useQuizResults } from '@/hooks/useQuizResults';
@@ -142,7 +142,10 @@ const Results = () => {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary">Academic Quiz Guardian</h1>
+          <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+            <img src="/logo.png" alt="Quizzly Logo" className="h-8 w-8" />
+            <h1 className="text-xl font-bold text-primary">Quizzly</h1>
+          </Link>
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleExportResults}>
               <File className="mr-2" />

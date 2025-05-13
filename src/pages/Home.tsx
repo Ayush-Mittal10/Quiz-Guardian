@@ -32,7 +32,7 @@ const Home = () => {
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
         <div className="container-theme py-4 flex justify-between items-center">
           <div className="flex items-center space-x-2">
-            <img src="/favicon.svg" alt="Quizzly Logo" className="h-9 w-9" />
+            <img src="/logo.png" alt="Quizzly Logo" className="h-9 w-9" />
             <span className="text-xl font-heading font-bold text-theme-navy">Quizzly</span>
           </div>
           <div className="flex items-center space-x-6">
@@ -69,7 +69,7 @@ const Home = () => {
       <section className="py-section bg-gradient-peach-lavender">
         <div className="container-theme grid md:grid-cols-2 gap-8 items-center">
           <div>
-            <h1 className="text-h1 font-bold font-heading leading-tight mb-4">
+            <h1 className="text-h1 text-black font-bold font-heading leading-tight mb-4">
               Elevate Your Quizzes
             </h1>
             <p className="text-xl text-theme-navy mb-8">
@@ -77,14 +77,20 @@ const Home = () => {
             </p>
             {isAuthenticated ? (
               <Link to="/dashboard">
-                <Button variant="cta" size="xl" className="shadow-lg">
+                <Button 
+                  className="bg-theme-teal hover:bg-theme-teal/90 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
+                >
                   Go to Dashboard
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
             ) : (
               <Link to="/register">
-                <Button variant="cta" size="xl" className="shadow-lg">
+                <Button 
+                  className="bg-theme-navy hover:bg-theme-navy/90 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 border-2 border-theme-peach"
+                >
                   Start Quizzing
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
             )}
@@ -198,14 +204,18 @@ const Home = () => {
           <h2 className="text-h3 font-bold mb-6 text-theme-navy">Ready to make quizzes fun?</h2>
           {isAuthenticated ? (
             <Link to="/dashboard">
-              <Button variant="cta" size="xl" className="group shadow-lg">
+              <Button 
+                className="bg-theme-teal hover:bg-theme-teal/90 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
+              >
                 Go to Your Dashboard
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
           ) : (
             <Link to="/register">
-              <Button variant="cta" size="xl" className="group shadow-lg">
+              <Button 
+                className="bg-theme-navy hover:bg-theme-navy/90 text-white px-8 py-6 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 border-2 border-theme-peach"
+              >
                 Create a Quiz
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
@@ -220,7 +230,7 @@ const Home = () => {
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <img src="/favicon.svg" alt="Quizzly Logo" className="h-8 w-8" />
+                <img src="/logo.png" alt="Quizzly Logo" className="h-8 w-8" />
                 <span className="text-xl font-heading font-bold text-white">Quizzly</span>
               </div>
               <p className="text-gray-300">Secure and simple quiz management for students.</p>

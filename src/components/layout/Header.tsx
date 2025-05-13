@@ -21,7 +21,7 @@ export const Header: React.FC<HeaderProps> = ({ showBackButton = false }) => {
               Back to Dashboard
             </Button>
           )}
-          <h1 className="text-xl font-bold text-primary">Academic Quiz Guardian</h1>
+          <h1 className="text-xl font-bold text-primary">Quizzly</h1>
         </div>
         
         {user && (
