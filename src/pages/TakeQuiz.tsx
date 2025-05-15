@@ -325,7 +325,33 @@ const TakeQuiz = () => {
   
   // Fix the addWarning function to ensure proper warning persistence
   const addWarning = (type: 'tab-switch' | 'focus-loss' | 'multiple-faces' | 'no-face', description: string) => {
-    if (!quiz || !attemptId) return;
+    if (!quiz || !attemptId) {
+      console.error('Cannot add warning: quiz or attemptId is null');
+      return;
+    }
+    
+    // Check if we've already reached the warning limit
+    if (warnings.length >= quiz.settings.allowedWarnings) {
+      console.log('Warning limit already reached, not adding more warnings');
+      return;
+    }
+    
+    // Check if this is a duplicate of the most recent warning
+    if (warnings.length > 0) {
+      const lastWarning = warnings[warnings.length - 1];
+      
+      // Don't add duplicate warnings of the same type in rapid succession
+      if (lastWarning.type === type) {
+        const lastTime = new Date(lastWarning.timestamp).getTime();
+        const now = Date.now();
+        
+        // If the last warning was less than 5 seconds ago, don't add a new one
+        if (now - lastTime < 5000) {
+          console.log(`Ignoring duplicate ${type} warning (throttled)`);
+          return;
+        }
+      }
+    }
     
     console.log(`Adding warning: ${type} - ${description}`);
     
@@ -346,48 +372,29 @@ const TakeQuiz = () => {
       const jsonWarnings: JsonWarning[] = updatedWarnings.map(warning => ({
         timestamp: warning.timestamp,
         type: warning.type,
-        description: warning.description || ''
+        description: warning.description
       }));
       
       console.log(`Total warnings now: ${updatedWarnings.length}`);
-      console.log('JSON warnings to save:', JSON.stringify(jsonWarnings));
       
-      // Immediately update warnings in the database
+      // Update warnings in the database
       if (attemptId) {
         try {
           supabase
             .from('quiz_attempts')
             .update({ warnings: jsonWarnings })
             .eq('id', attemptId)
-            .then(({ data, error }) => {
-              if (error) {
-                console.error("Error updating warnings:", error);
-                toast({
-                  title: "Warning Not Recorded",
-                  description: "There was an error recording the warning",
-                  variant: "destructive",
-                });
-              } else {
-                console.log("Warning added and saved to database:", data);
-                toast({
-                  title: "Integrity Warning",
-                  description: description,
-                  variant: "destructive",
-                });
-              }
+            .then(({ error }) => {
+              if (error) console.error("Error updating warnings:", error);
+              else console.log("Warning added and saved to database");
             });
         } catch (error) {
           console.error("Error updating warnings:", error);
-          toast({
-            title: "Warning Not Recorded",
-            description: "There was an error recording the warning",
-            variant: "destructive",
-          });
         }
       }
       
       // Auto-submit if warning limit reached
-      if (updatedWarnings.length >= (Number(quiz.settings.allowedWarnings) || 3)) {
+      if (updatedWarnings.length >= quiz.settings.allowedWarnings) {
         console.log("Warning limit reached, auto-submitting quiz");
         submitQuiz(true);
       }

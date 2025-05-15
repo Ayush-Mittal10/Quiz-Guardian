@@ -176,7 +176,10 @@ export const startFaceMonitoring = (
   lastActivity: number,
   onViolation: (type: 'no-face' | 'multiple-faces' | 'focus-loss', description: string) => void
 ): number => {
-  console.log(`Starting face monitoring with interval: ${intervalMs}ms`);
+  // Add throttling for warnings
+  let lastWarningTime = 0;
+  const THROTTLE_MS = 5000; // Only send a warning every 5 seconds
+  
   // Return the interval ID so it can be cleared later
   return window.setInterval(async () => {
     try {
@@ -184,9 +187,12 @@ export const startFaceMonitoring = (
       const analysis = analyzeFaceDetection(detectionResult, lastActivity);
       
       if (analysis.hasViolation && analysis.warningType) {
-        console.log(`Violation detected: ${analysis.warningType} - ${analysis.description}`);
-        console.log(`Calling onViolation callback...`);
-        onViolation(analysis.warningType, analysis.description);
+        const now = Date.now();
+        // Only trigger warning if enough time has passed since last warning
+        if (now - lastWarningTime >= THROTTLE_MS) {
+          lastWarningTime = now;
+          onViolation(analysis.warningType, analysis.description);
+        }
       }
     } catch (error) {
       console.error('Error in face monitoring interval:', error);

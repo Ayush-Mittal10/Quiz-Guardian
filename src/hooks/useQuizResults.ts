@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Quiz, Warning, QuizAttempt, QuizSettings } from '@/types';
@@ -10,10 +9,29 @@ export const useQuizResults = (quizId: string | undefined) => {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const { toast } = useToast();
+  const isFetchingRef = useRef(false);
+  const lastFetchTimeRef = useRef(0);
 
   // Define fetchQuizAndAttempts as a useCallback function so it can be returned and reused
   const fetchQuizAndAttempts = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      console.log('Fetch already in progress, skipping');
+      return;
+    }
+    
+    // Add throttling to prevent excessive API calls
+    const now = Date.now();
+    const THROTTLE_MS = 2000; // 2 seconds between fetches
+    if (now - lastFetchTimeRef.current < THROTTLE_MS) {
+      console.log('Throttling fetch, too soon since last fetch');
+      return;
+    }
+    
     if (!quizId) return;
+    
+    isFetchingRef.current = true;
+    lastFetchTimeRef.current = now;
     
     setLoading(true);
     try {
@@ -221,12 +239,19 @@ export const useQuizResults = (quizId: string | undefined) => {
       });
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   }, [quizId, toast]);
   
   // Call the function on mount
   useEffect(() => {
     fetchQuizAndAttempts();
+    
+    // Here's the cleanup
+    return () => {
+      // Reset the fetching state on unmount
+      isFetchingRef.current = false;
+    };
   }, [fetchQuizAndAttempts]);
 
   // Return the refreshResults function along with the other values
